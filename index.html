@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="GGN Office">
+<meta name="theme-color" content="#efe5cc">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>GGN Office</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#7cc7c4;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden;color:#2a2620}
+#app{display:flex;flex-direction:column;position:fixed;inset:0;overflow:hidden}
+header{background:#efe5cc;padding:9px 12px 8px;border-bottom:2px solid #d8caa6}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+h1{font-size:15px;margin:0;font-weight:800}
+h1 small{display:block;font-size:9.5px;font-weight:700;color:#8a7f66;letter-spacing:.6px;text-transform:uppercase}
+.clockbox{display:flex;align-items:center;gap:8px}
+.clock{text-align:right}
+.clock b{font-size:17px;font-variant-numeric:tabular-nums;display:block;line-height:1.05}
+.clock span{font-size:8.5px;font-weight:800;letter-spacing:.8px;color:#8a7f66;white-space:nowrap}
+#speedBtn{background:#2a2620;color:#fff;border-radius:9px;padding:7px 9px;font-size:13px}
+.stats{display:flex;gap:5px;margin-top:7px}
+.stat{flex:1;background:#fbf6e9;border:1px solid #e0d3b2;border-radius:9px;padding:4px 4px;text-align:center}
+.stat b{font-size:14px;display:block;font-variant-numeric:tabular-nums}
+.stat span{font-size:9px;color:#8a7f66;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+#stage{flex:1;position:relative;min-height:0;overflow:hidden;background:linear-gradient(160deg,#9fdad3 0%,#6fbfc0 55%,#58aeb6 100%)}
+canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+#card{position:absolute;min-width:150px;max-width:230px;background:#fff;border-radius:10px;padding:8px 11px 9px;box-shadow:0 6px 18px rgba(0,0,0,.22);font-size:12px;transform:translate(-50%,-100%);display:none;pointer-events:auto;z-index:4}
+#card:after{content:"";position:absolute;left:50%;bottom:-6px;margin-left:-6px;border:6px solid transparent;border-bottom:0;border-top-color:#fff}
+#card .st{font-weight:800;font-size:13px} #card .nm{color:#6e6a63;margin:1px 0 3px} #card .ln{color:#e2683c;font-weight:600}
+#card .bar{height:5px;background:#eee;border-radius:3px;margin-top:5px;overflow:hidden} #card .bar i{display:block;height:100%;background:#36b37e}
+#toast{position:absolute;left:50%;top:10px;transform:translate(-50%,-8px);background:#2a2620;color:#fff;padding:9px 13px;border-radius:12px;font-size:13px;font-weight:600;opacity:0;transition:.25s;pointer-events:none;max-width:92%;text-align:center;z-index:5}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+.zoom{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:6px}
+.zoom button{width:38px;height:38px;border-radius:50%;padding:0;font-size:20px;background:rgba(255,255,255,.92);color:#2a2620;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+footer{background:#efe5cc;border-top:2px solid #d8caa6;padding:7px 10px 12px}
+#log{font-size:12px;color:#4a443a;height:36px;overflow:hidden;margin-bottom:7px;line-height:1.45}
+#log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav{display:flex;gap:6px}
+button{border:0;border-radius:12px;font-weight:800;cursor:pointer;font-family:inherit}
+.nav button{flex:1;padding:10px 4px;font-size:13px;color:#2a2620;background:#fbf6e9;border:1px solid #e0d3b2;position:relative}
+.nav button.alt{background:#e8833a;color:#fff;border-color:#e8833a}
+#repBadge{position:absolute;top:-6px;right:-4px;background:#e5484d;color:#fff;border-radius:10px;font-size:11px;padding:1px 6px}
+button:active{transform:scale(.96)}
+/* sheet */
+#sheet{position:absolute;left:0;right:0;bottom:0;height:82%;background:#fbf8f0;border-radius:18px 18px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.25);transform:translateY(105%);transition:transform .28s,visibility 0s .28s;visibility:hidden;display:flex;flex-direction:column;z-index:10}
+#sheet.open{transform:none;visibility:visible;transition:transform .28s}
+.sh{display:flex;align-items:center;gap:6px;padding:10px 10px 8px;border-bottom:1px solid #eadfc6}
+.tabs{display:flex;gap:4px;flex:1}
+.tabs button{flex:1;padding:8px 4px;background:transparent;color:#8a7f66;font-size:13px}
+.tabs button.on{background:#efe5cc;color:#2a2620}
+#sheetClose{background:#efe5cc;width:34px;height:34px;padding:0;font-size:18px}
+#sheetBody{flex:1;overflow-y:auto;padding:12px 12px 30px;font-size:13px;-webkit-overflow-scrolling:touch}
+h3{margin:6px 0 4px;font-size:16px} h4{margin:14px 0 6px;font-size:13px}
+.mut{color:#8a7f66;font-size:12px} .center{text-align:center;margin-top:30px}
+.g{color:#1f9d5c} .r{color:#d33}
+.ritem{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #eadfc6;border-radius:12px;padding:11px 12px;margin-bottom:8px;position:relative}
+.ritem>div{flex:1;display:flex;flex-direction:column;gap:2px} .ritem .dot{width:8px;height:8px;border-radius:50%;background:#e5484d;flex:none}
+.chev{font-size:20px;color:#b9ab88}
+.back{background:none;color:#3d6cf0;padding:0;font-size:13px}
+.lead,.prod{background:#fff;border:1px solid #eadfc6;border-radius:14px;padding:11px 12px;margin:10px 0}
+.lead.decided{opacity:.72}
+.lh{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.tag{font-size:10.5px;font-weight:800;padding:3px 7px;border-radius:8px;white-space:nowrap}
+.tag.ok{background:#dff5e9;color:#1f8a52} .tag.bad{background:#fde7e0;color:#c5462a}
+.src{margin:5px 0 8px;line-height:1.4}
+.grid,.money{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.money{grid-template-columns:1fr 1fr}
+.grid div,.money div{background:#f6f1e4;border-radius:8px;padding:5px 7px;display:flex;flex-direction:column}
+.grid span,.money span{font-size:10px;color:#8a7f66;font-weight:700}
+.grid b,.money b{font-size:13.5px}
+.checks{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;margin:9px 0;font-size:12px}
+.checks i{color:#b9ab88;font-style:normal;font-size:10.5px}
+.y{color:#1f9d5c;font-weight:900} .n{color:#d33;font-weight:900} .q{color:#b9ab88;font-weight:900}
+.say{background:#fff7e3;border-radius:8px;padding:7px 9px;font-size:12px;margin:6px 0}
+.buyrow{display:flex;align-items:center;gap:6px;margin-top:9px}
+.step{display:flex;align-items:center;background:#f6f1e4;border-radius:10px}
+.step button{width:32px;height:34px;background:none;font-size:18px;padding:0}
+.step b{min-width:28px;text-align:center}
+.cost{flex:1;font-weight:800;font-size:14px;display:flex;flex-direction:column;line-height:1.1} .cost span{font-size:10px;color:#8a7f66;font-weight:700}
+.skipb{background:#eee6d3;padding:9px 11px;font-size:13px;color:#6e6a63}
+.buyb{background:#36b37e;color:#fff;padding:9px 13px;font-size:13px} .buyb:disabled{background:#b8d9c7}
+.dec{margin-top:8px;font-weight:800;font-size:13px} .dec.buy{color:#1f8a52} .dec.skip{color:#8a7f66}
+.stage{font-size:12px;font-weight:700;margin:4px 0 6px}
+.stage.live{color:#1f8a52} .stage.done{color:#3d6cf0} .stage.suppressed{color:#d33} .stage.at3pl,.stage.order{color:#c5741f}
+.pbar{height:6px;background:#f0e9d8;border-radius:3px;overflow:hidden} .pbar i{display:block;height:100%;background:#7aa7f5}
+.pbar i.live{background:#36b37e} .pbar i.done{background:#3d6cf0} .pbar i.suppressed{background:#d33}
+.pr{display:flex;justify-content:space-between;margin-top:7px;font-size:12px}
+.team{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #eadfc6;border-radius:12px;padding:10px;margin-bottom:8px}
+.av{width:36px;height:36px;border-radius:50%;color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;flex:none}
+.ti{flex:1;display:flex;flex-direction:column;gap:2px} .ti span{font-size:11.5px;color:#5c564b}
+.hire{background:#3d6cf0;color:#fff;padding:8px 10px;font-size:12px;white-space:nowrap} .hire:disabled{background:#b9c7ee}
+.hired{font-size:11px;font-weight:800;color:#1f8a52;background:#dff5e9;padding:4px 8px;border-radius:8px}
+#aiChip{background:#e3d7b8;color:#6e6550;border-radius:8px;padding:1px 6px;font-size:9.5px;letter-spacing:.3px;font-weight:800;vertical-align:1px}
+#aiChip.on{background:#2fb380;color:#fff}
+#loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(111,191,192,.85);color:#fff;font-weight:800;font-size:16px;z-index:6}
+.nav button{font-size:12.5px}
+.srct{display:inline-block;font-size:9.5px;font-weight:800;border-radius:6px;padding:1px 5px;vertical-align:1px;white-space:nowrap}
+.srct.ai{background:#e3ecff;color:#2f56c9} .srct.rl{background:#eee6d3;color:#8a7f66}
+.say.big{font-size:13px;line-height:1.45}
+.tips{margin:6px 0 10px;padding-left:18px;font-size:12.5px;line-height:1.45}
+.note{font-size:11.5px;color:#4a443a;background:#f6f1e4;border-radius:8px;padding:5px 8px;margin-top:6px;line-height:1.4}
+.note.msg{background:#fff;border:1px solid #eadfc6}
+.ritem.pending{background:#fff7e3}
+.aicard{display:flex;gap:10px;align-items:center;background:#fff;border:2px solid #e0d3b2;border-radius:14px;padding:11px;margin-bottom:10px}
+.aicard.on{border-color:#2fb380;background:#f1fbf5}
+.aicard>div{flex:1;display:flex;flex-direction:column;gap:4px} .aicard span{font-size:11.5px;color:#5c564b;line-height:1.4}
+.savecard{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px;font-size:12px;color:#5c564b}
+.aihead{display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
+.ailog{background:#fff;border:1px solid #eadfc6;border-radius:12px;padding:9px 11px;margin-bottom:8px;font-size:12.5px}
+.ailog .lh span{font-size:12.5px}
+.aiout{margin-top:6px;line-height:1.45} .aiout p{margin:0 0 4px}
+.dotc{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0}
+.nowrap{white-space:nowrap}
+details{margin-top:6px} summary{color:#3d6cf0;font-size:11.5px;cursor:pointer}
+pre{white-space:pre-wrap;word-break:break-word;background:#f6f1e4;border-radius:8px;padding:7px;font-size:10.5px;max-height:240px;overflow:auto}
+#cardBtns button{display:block;width:100%;margin-top:7px;background:#3d6cf0;color:#fff;padding:8px 6px;font-size:12px;border-radius:9px}
+#cardBtns:empty{display:none}
+.tag.warn{background:#fff1d6;color:#b06a00}
+.hist{font-size:11.5px !important}
+.reqs{background:#fff;border:1px solid #eadfc6;border-radius:12px;padding:8px 11px;margin:8px 0}
+.reqs ul{margin:6px 0;padding-left:18px;font-size:12px;line-height:1.5}
+.nav button{white-space:nowrap;padding:10px 2px;font-size:12px}
+#btnWhistle{flex:0 0 46px}
+.wm{font-size:11.5px;color:#0b5aa6;margin-top:5px;font-weight:700}
+.lot .grid{grid-template-columns:repeat(3,1fr)}
+header{padding-top:calc(9px + env(safe-area-inset-top))}
+footer{padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+#sheetBody{padding-bottom:calc(30px + env(safe-area-inset-bottom))}
+html,body{overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="top">
+      <h1><small>Pretend money · rules mode<button id="aiChip" style="display:none"></button></small>Global General Needs</h1>
+      <div class="clockbox"><div class="clock"><b id="clk">9:00 AM</b><span id="clkLbl">DAY 1</span></div><button id="speedBtn">1×</button></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="sCash">$1,000</b><span>Cash</span></div>
+      <div class="stat"><b id="sPay">$0</b><span>Payout</span></div>
+      <div class="stat"><b id="sStock">0</b><span>In stock</span></div>
+      <div class="stat"><b id="sSold">0</b><span>Sold</span></div>
+    </div>
+  </header>
+  <div id="stage">
+    <canvas id="c"></canvas><div id="card"><div id="cardInfo"></div><div id="cardBtns"></div></div><div id="toast"></div><div id="loading">Loading your company…</div>
+    <div class="zoom"><button id="zin">+</button><button id="zout">−</button></div>
+  </div>
+  <footer>
+    <div id="log"></div>
+    <div class="nav">
+      <button id="navRep">📋 Reports<span id="repBadge" style="display:none">0</span></button>
+      <button id="navProd">📦 Stock</button>
+      <button id="navTeam">👥 Team</button>
+      <button id="navAI" style="display:none">🧠 AI</button>
+      <button id="btnWhistle" class="alt">📣</button>
+    </div>
+  </footer>
+  <div id="sheet">
+    <div class="sh"><div class="tabs"><button data-t="reports">📋 Reports</button><button data-t="products">📦 Stock</button><button data-t="team">👥 Team</button></div><button id="sheetClose">✕</button></div>
+    <div id="sheetBody"></div>
+  </div>
+</div>
+<script>
+(() => {
+'use strict';
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const stage = document.getElementById('stage'), cardEl = document.getElementById('card');
+const W = 24, H = 25, WALL = 80;
+let scale = .7, offX = 0, offY = 0, dpr = 1, viewW = 0, viewH = 0, inited = false;
+
+// ================= helpers =================
+const iso = (x,y,z=0) => [(x-y)*32, (x+y)*16 - z];
+function poly(pts, fill){ ctx.beginPath(); pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])); ctx.closePath(); ctx.fillStyle=fill; ctx.fill(); }
+function shade(hex,f){ const n=parseInt(hex.slice(1),16); const c=v=>Math.max(0,Math.min(255,Math.round(v*f)));
+  return `rgb(${c(n>>16)},${c(n>>8&255)},${c(n&255)})`; }
+function box(x,y,w,d,h,col,z0=0,top){
+  poly([iso(x,y+d,z0),iso(x+w,y+d,z0),iso(x+w,y+d,z0+h),iso(x,y+d,z0+h)], shade(col,.86));
+  poly([iso(x+w,y,z0),iso(x+w,y+d,z0),iso(x+w,y+d,z0+h),iso(x+w,y,z0+h)], shade(col,.7));
+  poly([iso(x,y,z0+h),iso(x+w,y,z0+h),iso(x+w,y+d,z0+h),iso(x,y+d,z0+h)], top||col);
+}
+const rectY = (x0,x1,y,z0,z1,c)=>poly([iso(x0,y,z0),iso(x1,y,z0),iso(x1,y,z1),iso(x0,y,z1)],c);  // on a plane y=const
+const rectX = (x,y0,y1,z0,z1,c)=>poly([iso(x,y0,z0),iso(x,y1,z0),iso(x,y1,z1),iso(x,y0,z1)],c);  // on a plane x=const
+function textY(x,y,z,txt,font,col,align='left'){ const [sx,sy]=iso(x,y,z); ctx.save(); ctx.translate(sx,sy); ctx.transform(1,.5,0,1,0,0);
+  ctx.font=font; ctx.fillStyle=col; ctx.textAlign=align; ctx.fillText(txt,0,0); ctx.restore(); }
+function textX(x,y,z,txt,font,col,align='left'){ const [sx,sy]=iso(x,y,z); ctx.save(); ctx.translate(sx,sy); ctx.transform(1,-.5,0,1,0,0);
+  ctx.font=font; ctx.fillStyle=col; ctx.textAlign=align; ctx.fillText(txt,0,0); ctx.restore(); }
+function rr(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+let seed=7; const rnd=()=>((seed=(seed*16807)%2147483647)/2147483647);
+const pick = a => a[Math.floor(Math.random()*a.length)];
+
+// ================= map / collision =================
+const blocked = new Uint8Array(W*H), hW = new Set(), vW = new Set();
+const blk = (x,y)=>{ blocked[y*W+x]=1; };
+const statics = [];                     // depth-sorted drawables (one per cell)
+function piece(i,j,f,{block=true,bias=0}={}){ statics.push({d:i+j+1+bias,f}); if(block) blk(i,j); }
+
+// glass partitions (y-line = horizontal wall between rows, x-line = between columns)
+function glassY(i,c){ hW.add(i+','+c); statics.push({d:i+.5+c, f:()=>{
+  rectY(i,i+1,c,0,46,'rgba(205,236,250,.32)');
+  box(i,c-.04,1,.08,3,'#3b4049',46);
+  box(i,c-.04,.06,.08,46,'#555b66'); }}); }
+function glassX(c,j){ vW.add(c+','+j); statics.push({d:c+j+.5, f:()=>{
+  rectX(c,j,j+1,0,46,'rgba(205,236,250,.32)');
+  box(c-.04,j,.08,1,3,'#3b4049',46);
+  box(c-.04,j,.08,.06,46,'#555b66'); }}); }
+function doorPostY(i,c){ statics.push({d:i+.5+c,f:()=>{ box(i,c-.04,.06,.08,46,'#555b66'); box(i,c-.04,1,.08,4,'#3b4049',46); }}); }
+function doorPostX(c,j){ statics.push({d:c+j+.5,f:()=>{ box(c-.04,j,.08,.06,46,'#555b66'); box(c-.04,j,.08,1,4,'#3b4049',46); }}); }
+
+for(let x=0;x<8;x++) x===3 ? doorPostY(x,7) : glassY(x,7);           // director's office front
+for(let y=5;y<7;y++) glassX(8,y);
+for(let y=5;y<10;y++) y===7 ? doorPostX(12,y) : glassX(12,y);        // work room side
+for(let x=12;x<24;x++) x===13 ? doorPostY(x,10) : glassY(x,10);      // work room front
+for(let y=10;y<18;y++) y===11 ? doorPostX(12,y) : glassX(12,y);      // meeting room side
+
+// ---------- core block (restrooms / server room) ----------
+for(let i=8;i<12;i++) for(let j=0;j<5;j++) piece(i,j,()=>{
+  box(i,j,1,1,64,'#f1eee7',0,'#2a2d33');
+  ctx.strokeStyle='#2a2d33'; ctx.lineWidth=1.2; ctx.beginPath(); [iso(i,j,64),iso(i+1,j,64),iso(i+1,j+1,64),iso(i,j+1,64)].forEach((p,k)=>k?ctx.lineTo(...p):ctx.moveTo(...p)); ctx.closePath(); ctx.stroke();
+  if(j===4 && (i===9||i===10)){ rectY(i+.2,i+.8,5,0,36,'#cdb596'); rectY(i+.66,i+.72,5,16,19,'#8a7356');
+    textY(i+.5,5,44,'WC','700 9px system-ui','#555','center'); }
+  if(i===11 && j===2){ rectX(12,j+.15,j+.85,0,38,'#6c7581'); rectX(12,j+.3,j+.7,41,47,'#2fbf5f'); }
+  if(i===11 && j===1){ textX(12,j+.9,30,'SERVERS','700 8px system-ui','#666'); }
+});
+
+// ---------- furniture ----------
+function plant(i,j,big){ piece(i,j,()=>{ box(i+.3,j+.3,.4,.4,big?12:9,'#c9c2b4');
+  const [px,py]=iso(i+.5,j+.5,(big?12:9)+12);
+  ctx.fillStyle='#3d9a4f'; for(const [a,b,r] of [[-6,2,8],[6,2,8],[0,-6,9],[0,4,8]]){ ctx.beginPath(); ctx.arc(px+a,py+b,r,0,7); ctx.fill(); }
+  ctx.fillStyle='#5cbf6a'; ctx.beginPath(); ctx.arc(px-3,py-6,5,0,7); ctx.fill(); }); }
+function officeChair(i,j,col='#2e3239'){ box(i+.42,j+.42,.16,.16,6,'#1d2026'); box(i+.25,j+.3,.5,.45,4,col,6); box(i+.25,j+.18,.5,.12,15,col,9); }
+
+// Director's office
+[4,5,6].forEach(i=>piece(i,1,()=>{
+  box(i,1.1,1,.75,17,'#c98b4f',0,'#d89a5c');
+  if(i===5){ box(5.15,1.15,.7,.09,20,'#262a31',17); box(5.45,1.25,.1,.1,3,'#262a31',17); }
+  if(i===4){ box(4.2,1.35,.35,.25,2,'#f4f1ea',17); }
+  if(i===6){ box(6.3,1.3,.2,.2,6,'#e8e2d6',17); textY(4.15,1.85,7,'ROYCE · CEO','800 8px system-ui','#5a3a1a'); }
+}));
+piece(5,0,()=>{ box(5.2,.25,.6,.5,5,'#3b2a20',6); box(5.2,.12,.6,.14,26,'#3b2a20',9); },{block:false});
+[2,3,4].forEach(j=>piece(0,j,()=>{ box(.15,j,.7,1,9,'#a5532b'); box(.15,j,.22,1,21,'#8e4523');
+  if(j===2) box(.15,2,.7,.14,15,'#8e4523'); if(j===4) box(.15,4.86,.7,.14,15,'#8e4523'); }));
+piece(2,3,()=>{ box(2.15,3.2,.75,.6,7,'#efe9df'); box(2.4,3.35,.3,.22,2,'#d9473f',7); });
+[4,6].forEach(i=>piece(i,3,()=>{ box(i+.15,3.15,.7,.7,9,'#dcd2c2'); box(i+.15,3.68,.7,.17,20,'#cfc3b0'); }));
+piece(7,5,()=>{ box(7.15,5.15,.7,.7,10,'#7d5c3a');
+  const [px,py]=iso(7.5,5.5,22); ctx.fillStyle='#f0c23a'; ctx.beginPath(); ctx.arc(px,py,5,0,Math.PI); ctx.fill(); ctx.fillRect(px-1.5,py,3,7); ctx.fillRect(px-4,py+7,8,2);
+  rectY(7.15,7.85,5.85,10,34,'rgba(210,240,255,.35)'); rectX(7.85,5.15,5.85,10,34,'rgba(210,240,255,.28)');
+  poly([iso(7.15,5.15,34),iso(7.85,5.15,34),iso(7.85,5.85,34),iso(7.15,5.85,34)],'rgba(230,248,255,.45)'); });
+plant(0,6,true); plant(7,0);
+
+// Work room (bench desks + stations)
+const seats = [];
+[[1,2],[5,6]].forEach(([sy,dy])=>{
+  for(let i=14;i<22;i++){
+    const isSeat = (i%2===1);
+    piece(i,dy,()=>{
+      box(i,dy+.05,1,.72,15,'#f5f5f2',0,'#fbfbf9');
+      if(i===14) box(i,dy+.05,.06,.72,15,'#c9cbd0');
+      if(isSeat){
+        const ag = agents.find(a=>a.seatCell[0]===i && a.seatCell[1]===sy);
+        const on = ag && ag.state==='work';
+        box(i+.06,dy+.1,.4,.08,15,'#262a31',15); box(i+.22,dy+.18,.08,.08,2,'#262a31',15);
+        if(on) poly([iso(i+.06,dy+.1,30),iso(i+.46,dy+.1,30),iso(i+.46,dy+.1,32),iso(i+.06,dy+.1,32)],'#7fd3ff');
+        box(i+.55,dy+.2,.32,.14,2,'#d9dbe0',15);
+        box(i+.98,dy+.05,.04,.72,10,'#cfd3da',15);   // low divider
+      } else { box(i+.4,dy+.3,.18,.14,3,'#e2683c',15); }
+    });
+    if(isSeat){ seats.push([i,sy]); piece(i,sy,()=>officeChair(i,sy),{block:false,bias:-.2}); }
+  }
+});
+piece(23,4,()=>{ box(23.15,4.1,.7,.8,32,'#c9ced6'); for(const z of [8,16,24]) rectX(23.85,4.2,4.8,z,z+1,'#9aa1ab'); });
+plant(12,0,true); plant(23,9,true); plant(23,0);
+
+// Common area
+[9,10].forEach(j=>piece(2,j,()=>{ box(2.1,j,.75,1,17,'#f4f4f2',0,'#fafaf8'); rectX(2.85,j,j+1,6,11,'#e8833a');
+  if(j===9){ box(2.3,9.3,.3,.08,10,'#262a31',17); } if(j===10) textX(2.85,10.95,4,'WELCOME','800 7px system-ui','#fff'); }));
+piece(6,8,()=>{ box(6.28,8.28,.44,.44,22,'#e9eef3'); box(6.33,8.33,.34,.34,15,'#7cc6ff',22,'#a6daff'); });
+piece(7,8,()=>{ box(7.1,8.12,.8,.72,38,'#d84a3f'); rectY(7.18,7.62,8.84,14,33,'#ffe2b6'); rectY(7.68,7.84,8.84,20,30,'#2b2f36'); });
+[3,4].forEach(i=>piece(i,13,()=>{ box(i+(i===3?.1:0),13.25,i===3?.9:.9,.5,7,'#5c3a22'); box(i,13.08,1,.84,4,'#7a4a2a',7);
+  poly([iso(i===3?3.1:i,13.18,11.1),iso(i===4?4.9:i+1,13.18,11.1),iso(i===4?4.9:i+1,13.82,11.1),iso(i===3?3.1:i,13.82,11.1)],'#2e8fa8');
+  if(i===4){ for(const [bx,by,c] of [[4.3,13.4,'#f2f2f2'],[4.55,13.5,'#e04545'],[4.6,13.65,'#f0c23a'],[4.7,13.45,'#2f6fd1']]){ const [px,py]=iso(bx,by,12); ctx.fillStyle=c; ctx.beginPath(); ctx.arc(px,py,2.3,0,7); ctx.fill(); } } }));
+piece(1,15,()=>{ box(1.12,15.2,.76,.6,13,'#2a2d33'); box(1.18,15.25,.64,.5,1,'#3fae5f',13); for(let k=0;k<4;k++) box(1.08,15.3+k*.13,.84,.03,1,'#c0c4cc',15); });
+[6,7].forEach(i=>piece(i,15,()=>{ box(i+.15,15.3,.7,.4,10,'#3a3f48'); box(i,15.1,1,.8,3,'#2f6fd1',10,'#3b7ae0');
+  poly([iso(i,15.48,13.1),iso(i+1,15.48,13.1),iso(i+1,15.52,13.1),iso(i,15.52,13.1)],'#fff');
+  if(i===7) box(6.98,15.08,.04,.84,5,'#f4f4f4',13); }));
+let leaderboard = [];
+[9,10].forEach(i=>piece(i,11,()=>{ box(i+.45,11.55,.1,.1,12,'#3a3f48'); box(i,11.5,1,.16,30,'#2fa45a',12,'#27914d');
+  if(i===10){ rectY(9.08,10.92,11.66,15,40,'#1f7a40');
+    textY(9.2,11.66,34,'🏆 TOP AGENTS','800 7px system-ui','#fff');
+    leaderboard.slice(0,3).forEach((a,k)=>textY(9.2,11.66,26-k*5,`${k+1}. ${a.name}  ${a.done} tasks`,'600 5.5px system-ui','#dff7e6')); } }));
+[9,10].forEach(i=>piece(i,12,()=>{ box(i,12.2,1,.72,8,'#9aa3ad'); box(i,12.12,1,.2,20,'#8a939d');
+  if(i===9) box(9,12.12,.14,.8,13,'#8a939d'); if(i===10) box(10.86,12.12,.14,.8,13,'#8a939d'); },{block:false,bias:-.3}));
+[12,13].forEach(j=>piece(0,j,()=>{ box(.1,j+.08,.72,.84,42,j===12?'#5b3fd1':'#d6366e'); rectX(.82,j+.2,j+.8,22,34,'#7ff0ff');
+  rectX(.82,j+.15,j+.85,36,41,'#ffd23f'); box(.82,j+.25,.2,.5,2,'#222',16); }));
+[[3,16,'#e8833a'],[4,17,'#3bb3a9']].forEach(([i,j,c])=>piece(i,j,()=>{ const [px,py]=iso(i+.5,j+.5,4);
+  ctx.fillStyle=shade(c,.75); ctx.beginPath(); ctx.ellipse(px,py+2,17,9,0,0,7); ctx.fill();
+  ctx.fillStyle=c; ctx.beginPath(); ctx.ellipse(px,py-2,16,9,0,0,7); ctx.fill(); },{block:false,bias:-.3}));
+plant(11,9); plant(0,17,true); plant(8,17); plant(11,17,true); plant(0,7);
+piece(7,12,()=>{ box(7.1,12.2,.8,.6,22,'#d9dde3'); for(const z of [7,14]) rectY(7.15,7.85,12.8,z,z+1,'#aeb4bd');
+  box(7.2,12.3,.2,.3,5,'#e04545',22); box(7.5,12.3,.25,.3,7,'#3d6cf0',22); });
+
+// Meeting room
+for(let i=15;i<21;i++) for(let j=13;j<15;j++) piece(i,j,()=>{
+  const x0=i===15?15.1:i, x1=i===20?20.9:i+1, y0=j===13?13.15:j, y1=j===14?14.85:j+1;
+  if(j===14 && (i===15||i===20)) box(i===15?15.3:20.5,14.3,.2,.2,12,'#8a6a45');
+  box(x0,y0,x1-x0,y1-y0,3,'#c99a64',12,'#d6a874');
+  if(j===13 && i%2===0) box(i+.3,13.4,.32,.22,1,'#ffffff',15);
+  if(j===14 && i%2===1) box(i+.3,14.3,.32,.22,1,'#ffffff',15);
+});
+const meetSeats=[[15,12],[17,12],[19,12],[16,15],[18,15],[20,15]];
+meetSeats.forEach(([i,j])=>piece(i,j,()=>{ box(i+.28,j+.3,.44,.42,8,'#e8833a'); },{block:false,bias:-.3}));
+plant(13,17,true); plant(23,17); plant(23,11);
+// ---------- Marketplace wing (y 18-25): team room (x 0-12) + warehouse (x 12-24) ----------
+for(let x=0;x<24;x++) (x===5||x===18) ? doorPostY(x,18) : glassY(x,18);
+for(let y=18;y<H;y++) y===21 ? doorPostX(12,y) : glassX(12,y);
+for(let i=2;i<9;i++){
+  const isSeat=(i%2===1);
+  piece(i,21,()=>{
+    box(i,21.05,1,.72,15,'#f5f5f2',0,'#fbfbf9');
+    if(i===2) box(i,21.05,.06,.72,15,'#c9cbd0');
+    if(isSeat){ const ag=agents.find(a=>a.seatCell[0]===i&&a.seatCell[1]===20); const on=ag&&ag.state==='work';
+      box(i+.06,21.1,.4,.08,15,'#262a31',15); box(i+.22,21.18,.08,.08,2,'#262a31',15);
+      if(on) poly([iso(i+.06,21.1,30),iso(i+.46,21.1,30),iso(i+.46,21.1,32),iso(i+.06,21.1,32)],'#7fd3ff');
+      box(i+.55,21.2,.32,.14,2,'#d9dbe0',15); box(i+.98,21.05,.04,.72,10,'#cfd3da',15);
+    } else box(i+.3,21.25,.38,.34,8,'#c8a46e',15,'#d8b47e');
+  });
+  if(isSeat){ seats.push([i,20]); piece(i,20,()=>officeChair(i,20),{block:false,bias:-.2}); }
+}
+[9,10].forEach(i=>piece(i,19,()=>{ box(i,19.2,1,.72,8,'#5aa38f'); box(i,19.12,1,.2,20,'#4e8f7d');
+  if(i===9) box(9,19.12,.14,.8,13,'#4e8f7d'); if(i===10) box(10.86,19.12,.14,.8,13,'#4e8f7d'); },{block:false,bias:-.3}));
+// packing station + pallets in the team room
+[9,10].forEach(i=>piece(i,23,()=>{ box(i,23.1,1,.8,16,'#d9dde3',0,'#eef0f3'); if(i===9){ box(9.2,23.3,.35,.3,7,'#c8a46e',16); box(9.6,23.35,.25,.2,4,'#e8c33a',16); } else { box(10.2,23.25,.5,.4,3,'#ffffff',16); } }));
+const pallet=(i,j,h,c)=>piece(i,j,()=>{ box(i+.06,j+.06,.88,.88,4,'#b98b55'); box(i+.14,j+.14,.72,.72,h,c||'#c8a46e',4,'#d8b47e'); rectY(i+.14,i+.86,j+.86,4+h*.45,4+h*.55,'#e8c33a'); });
+pallet(1,23,22); pallet(2,24,14,'#b8955f'); pallet(1,24,30);
+plant(11,24,true); plant(0,19); plant(11,19);
+// warehouse racks
+for(const rj of [20,23]) for(let i=14;i<22;i++) piece(i,rj,()=>{
+  for(const z of [0,14,28]){ box(i,rj+.1,1,.8,2,'#e8833a',z); }
+  box(i,rj+.1,.06,.8,42,'#2f6fd1'); if(i===21) box(i+.94,rj+.1,.06,.8,42,'#2f6fd1');
+  const cols=['#c8a46e','#b8955f','#d8b47e','#a9824f'];
+  for(const [k,z] of [[0,2],[1,16],[2,30]]) if((i*7+rj*3+k)%4!==0) box(i+.12,rj+.18,.76,.64,10,cols[(i+k)%4],z,'#dcbf8f');
+});
+pallet(22,19,18); pallet(23,19,26,'#b8955f'); pallet(23,24,20);
+piece(13,24,()=>{ box(13.15,24.2,.7,.6,10,'#e8c33a'); box(13.2,24.2,.5,.15,24,'#3a3f48',10); box(13.75,24.25,.06,.5,30,'#3a3f48'); });
+
+// ================= break spots =================
+const spots = [
+  ...[[5,8],[6,9],[7,9]].map(([x,y])=>({x,y,k:'cooler'})),
+  ...[[2,13],[5,13]].map(([x,y])=>({x,y,k:'pool'})),
+  ...[[5,15],[8,15]].map(([x,y])=>({x,y,k:'pong'})),
+  ...[[1,16],[2,15]].map(([x,y])=>({x,y,k:'foos'})),
+  ...[[9,12],[10,12]].map(([x,y])=>({x,y,k:'sofa',sit:true})),
+  ...[[3,16],[4,17]].map(([x,y])=>({x,y,k:'beanbag',sit:true})),
+  ...[[1,12],[1,13]].map(([x,y])=>({x,y,k:'arcade'})),
+  ...meetSeats.map(([x,y])=>({x,y,k:'meeting',sit:true})),
+  ...[[9,19],[10,19]].map(([x,y])=>({x,y,k:'sofa',sit:true})),
+].map(s=>({...s, cx:s.x+.5, cy:s.y+.5}));
+
+// ================= pathfinding =================
+function passable(cx,cy,nx,ny){
+  if(nx<0||ny<0||nx>=W||ny>=H||blocked[ny*W+nx]) return false;
+  const dx=nx-cx, dy=ny-cy;
+  if(dx&&dy) return passable(cx,cy,nx,cy)&&passable(nx,cy,nx,ny)&&passable(cx,cy,cx,ny)&&passable(cx,ny,nx,ny);
+  if(dx===1) return !vW.has(nx+','+cy); if(dx===-1) return !vW.has(cx+','+cy);
+  if(dy===1) return !hW.has(cx+','+ny); return !hW.has(cx+','+cy);
+}
+function astar(sx,sy,tx,ty){
+  const N=W*H, g=new Float32Array(N).fill(1e9), came=new Int32Array(N).fill(-1), closed=new Uint8Array(N);
+  const hh=i=>{const dx=Math.abs(i%W-tx),dy=Math.abs(((i/W)|0)-ty);return Math.max(dx,dy)+.414*Math.min(dx,dy);};
+  const s=sy*W+sx, t=ty*W+tx, open=[s]; g[s]=0;
+  while(open.length){
+    let bi=0,bf=1e9; for(let k=0;k<open.length;k++){const f=g[open[k]]+hh(open[k]); if(f<bf){bf=f;bi=k;}}
+    const cur=open.splice(bi,1)[0]; if(closed[cur]) continue; closed[cur]=1;
+    if(cur===t){ const p=[]; let c=cur; while(c!==-1){ p.push([c%W+.5,((c/W)|0)+.5]); c=came[c]; } return p.reverse(); }
+    const cx=cur%W, cy=(cur/W)|0;
+    for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++){ if(!dx&&!dy) continue;
+      const nx=cx+dx, ny=cy+dy; if(!passable(cx,cy,nx,ny)) continue;
+      const n=ny*W+nx, ng=g[cur]+(dx&&dy?1.414:1); if(ng<g[n]){ g[n]=ng; came[n]=cur; open.push(n); } }
+  }
+  return null;
+}
+function walkTo(a, cx, cy, next){
+  const p = astar(Math.floor(a.x),Math.floor(a.y),Math.floor(cx),Math.floor(cy));
+  a.path = p ? p.slice(1) : []; a.path.push([cx,cy]); a.next=next; a.state='walk';
+}
+
+// ================= agents =================
+const SKIN=['#f1c9a5','#e0ac80','#c68a5e','#8d5a3b','#f5d6b8','#a86b45','#d9a47a','#b07a52','#c68a5e','#f1c9a5','#8d5a3b'];
+const ROLES=[
+ {key:'scout', name:'Scout', role:'Product Scout',        shirt:'#3d6cf0',hair:'#2b1d14',style:'short',hire:0,  does:'Reviews candidate products against your buy rules and sends you a report.'},
+ {key:'rex',   name:'Rex',   role:'Product Research',     shirt:'#1fa3b8',hair:'#4a2f1d',style:'short',hire:60, does:'Reads each lead’s 12-week price & seller history and flags prices likely to crash.'},
+ {key:'ivy',   name:'Ivy',   role:'Compliance',           shirt:'#c0399b',hair:'#6b3a1e',style:'long', hire:60, does:'Judges IP-complaint risk for each lead before you buy.'},
+ {key:'stocky',name:'Stocky',role:'Purchasing & 3PL',     shirt:'#f0a63a',hair:'#3a2a1a',style:'spiky',hire:0,  does:'Writes the purchase order for what you approve and sends it to the 3PL.'},
+ {key:'lexi',  name:'Lexi',  role:'Shipments & Listings', shirt:'#e0457b',hair:'#6b3a1e',style:'long', hire:50, does:'Plans FBA shipments (boxes, prep). Without her, Stocky covers it slower.'},
+ {key:'penny', name:'Penny', role:'Pricing',              shirt:'#2fb380',hair:'#151515',style:'bun',  hire:0,  does:'Studies competitor offers and sets your price every day to win the Buy Box.'},
+ {key:'hana',  name:'Hana',  role:'Customer Support',     shirt:'#8a5cf0',hair:'#1a1a1a',style:'long', hire:50, does:'Reads buyer messages, writes replies, and decides refund / replace / reply.'},
+ {key:'bea',   name:'Bea',   role:'Bookkeeping',          shirt:'#7a8a3a',hair:'#2a1a12',style:'bun',  hire:0,  does:'Writes your end-of-day money report with advice.'},
+ {key:'liq',   name:'Sal',   role:'Liquidation Buyer',    shirt:'#8d6e4c',hair:'#3a2a1a',style:'curly',hire:75, wing:true, does:'Checks liquidation lots against your lot rules and sends you a bid report. Never bids without your OK.'},
+ {key:'ebay',  name:'Eli',   role:'eBay Seller',          shirt:'#e53238',hair:'#151515',style:'short',hire:60, wing:true, does:'Lists liquidation items on eBay, answers Best Offers and ships orders every day.'},
+ {key:'walmart',name:'Wally',role:'Walmart Seller',       shirt:'#0071ce',hair:'#d9b36a',style:'spiky',hire:60, wing:true, does:'Lists your live Amazon products on Walmart Marketplace (WFS) for extra sales.'},
+];
+const WAGE=3;
+const GOSSIP=["Did you see that ROI? 👀","Scout's leads are 🔥 today","Penny reprices in her sleep","Is it payout day yet?",
+  "Don't tell Royce I'm on break 🤫","Amazon fees are wild","Stocky lost a tracking number again 😂","Rematch after this?",
+  "Bea knows exactly how much we made 😳","Five more minutes, then I'll work…","I heard we might hire more agents","The 3PL is so slow today",
+  "Who keeps leaving tokens in the fridge?","This water is my favorite API 💧"];
+let agents=[];
+function makeAgent(idx, queue=[]){
+  const r=ROLES[idx], seatCell=seats[idx];
+  const free=spots.filter(s=>!agents.some(o=>o.spot===s)), s=pick(free);
+  return {...r, i:idx, station:'C0'+(idx+1), skin:SKIN[idx], seatCell, seat:{cx:seatCell[0]+.5, cy:seatCell[1]+.5},
+    x:s.cx, y:s.cy, spot:s, state:'idle', path:[], next:null, queue, task:null, prog:0,
+    idleT:3+Math.random()*5, wanderT:5+Math.random()*6, bubble:null, bubbleT:0, bob:Math.random()*6, done:0};
+}
+const boss={name:'Royce', role:'CEO', boss:true, shirt:'#26324f', hair:'#121212', style:'short', skin:'#c68a5e', x:5.5, y:.6, state:'boss', bob:0, hx:0, hy:0};
+const hiredA = key => agents.find(a=>a.key===key);
+const isSlacking = a => a.state==='idle' || (a.state==='walk' && a.next==='idle');
+
+// ================= state =================
+const DAY=45;
+let speed=1;
+function freshState(){ return {v:3, cash:1000, pending:0, day:1, time:.375, nextPayout:3, reports:[], purchases:[], messages:[], nid:1,
+  total:{units:0,revenue:0,net:0,spent:0,overhead:0,refunds:0}, today:{units:0,revenue:0,net:0,returns:0},
+  hunting:false, pendingReport:null, lots:[], lotHunting:false, nextLotHuntAt:0, hired:['scout','stocky','penny','bea'], queues:{}, aiOn:false, aiCalls:0, started:Date.now()}; }
+let G=freshState();
+const now=()=>G.day+G.time;
+const $$=n=>(n<0?'-':'')+'$'+Math.abs(Math.round(n*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const $0=n=>(n<0?'-':'')+'$'+Math.round(Math.abs(n)).toLocaleString();
+const rr2=(a,b)=>a+Math.random()*(b-a);
+const r2=n=>Math.round(n*100)/100;
+
+const PRODUCTS=["Stainless Mixing Bowl Set (5-pc)","Silicone Baking Mat 2-Pack","Kids Watercolor Paint Kit","LED Closet Light 3-Pack",
+ "Bamboo Cutting Board Set","Insulated Water Bottle 32oz","Dog Rope Toy Bundle","Resistance Bands Set","Car Vent Phone Mount",
+ "Family Trivia Board Game","Rustproof Shower Caddy","Glass Meal Prep Containers 10-pc","Yoga Mat 6mm","Claw Hair Clips 12-pc",
+ "Digital Kitchen Scale","Throw Pillow Covers 2-Pack","Garden Hose Nozzle","1000-pc Landscape Puzzle","Mesh Desk Organizer",
+ "Insulated Lunch Bag","Cast Iron Skillet 10in","Bath Towel Set 6-pc","Kids Art Easel","LED Desk Lamp","Pet Grooming Brush",
+ "Reusable Snack Bags 8-pc","Herb Garden Starter Kit","Magnetic Spice Jars 12-pc","Wireless Doorbell","Kids Building Blocks 500-pc",
+ "Electric Milk Frother","Shoe Rack 3-Tier","Silicone Ice Cube Trays 4-Pack","Travel Neck Pillow","Kids Science Experiment Kit"];
+const STORES=["Walmart.com","Target.com","Kohls.com","HomeDepot.com","Walgreens.com","BigLots.com","Macys.com","BestBuy.com"];
+
+function makeCandidate(usedNames){
+  let name; do{ name=pick(PRODUCTS); }while(usedNames.has(name)); usedNames.add(name);
+  const cost=r2(rr2(5,28))-0.01;
+  const buyBox=Math.round(cost*(Math.random()<.2?rr2(1.45,1.85):rr2(1.9,3.0)))-0.01;
+  const above=Math.random()<.25 ? rr2(.035,.07) : rr2(-.01,.025);
+  const ourPrice=r2(buyBox*(1+above)), fba=r2(rr2(3.2,6.4)), prep=1.5;
+  const profit=r2(ourPrice-ourPrice*.15-fba-cost-prep);
+  const bsr=Math.random()<.27 ? Math.round(rr2(105000,210000)) : Math.round(rr2(6000,98000));
+  const monthly=Math.max(40,Math.round(3400*Math.pow(10000/bsr,.7)));   // last month's sales
+  const falling=Math.random()<.2;
+  const salesHist=falling?[Math.round(monthly*rr2(1.5,2.2)),Math.round(monthly*rr2(1.2,1.5)),monthly]:[Math.round(monthly*rr2(.85,1.15)),Math.round(monthly*rr2(.85,1.15)),monthly];
+  const sellers=Math.random()<.07 ? Math.floor(rr2(0,2)) : Math.floor(rr2(2,8));
+  const amazon=Math.random()<.15;
+  const share=Math.max(1,Math.round(monthly/(sellers+1)*(amazon?.15:1)));
+  const volatile=Math.random()<.27, ip=Math.random()<.15;
+  // 12 weeks of history (oldest → newest)
+  const hist=[], offers=[]; let p=buyBox*(volatile?rr2(1.15,1.45):rr2(.97,1.04)), o=volatile?Math.max(1,sellers-rr2(3,6)):sellers;
+  for(let k=0;k<12;k++){ hist.push(r2(k===11?buyBox:p)); offers.push(Math.max(0,Math.round(k===11?sellers:o)));
+    p=volatile? p*rr2(.86,1.05) : p*rr2(.985,1.02); o=volatile? o+rr2(0,1.2) : o+rr2(-.6,.6); }
+  const ipInfo = ip ? {brand:pick(['Brand-registered name brand','Well-known national brand','Brand with its own Amazon storefront']),
+      complaintReports:Math.floor(rr2(2,10)), chatter:pick(['Several sellers say they got IP complaints after listing this','Brand is known to send complaints to resellers','Listing was suppressed for some sellers last month'])}
+    : {brand:pick(['Generic / unbranded','Small private-label brand','Store-brand bundle','Unbranded import']),
+      complaintReports:Math.random()<.3?1:0, chatter:pick(['No complaint reports found','One old, unconfirmed complaint report','Many resellers on the listing with no issues reported'])};
+  const lead={id:G.nid++, name, store:pick(STORES), cost, buyBox, ourPrice, fba, prep, profit, roi:r2(profit/cost),
+    bsr, monthly, salesHist, sellers, amazon, share, volatile, ip, hist, offers, ipInfo, trueMonthly:monthly*rr2(.55,1.25), decision:null, qty:0};
+  const avg=(salesHist[0]+salesHist[1]+salesHist[2])/3;
+  lead.above=r2(above*100);
+  lead.rules={bsr:bsr<=REQ.bsrMax, amazon:!amazon, sellers:sellers>=REQ.minSellers, price:above<=REQ.maxAbove, profit:lead.roi>=REQ.minROI, trend:monthly>=avg*REQ.trendMin};
+  return lead;
+}
+const REQ={bsrMax:100000, minSellers:2, maxAbove:.03, minROI:.25, trendMin:.7};
+const RULE_KEYS=['bsr','amazon','sellers','price','profit','trend'];
+const RULE_LABEL={bsr:'BSR over 100k',amazon:'Amazon on the listing',sellers:'fewer than 2 FBA sellers',price:'price over 3% above Buy Box',profit:'ROI under 25%',trend:'sales falling'};
+const passCount=l=>RULE_KEYS.filter(k=>l.rules[k]).length;
+const passesAll=l=>passCount(l)===RULE_KEYS.length;
+const maxAfford=l=>Math.max(0,Math.floor(Math.max(0,G.cash)/l.cost));
+function suggestQty(l){ const cap=Math.floor(Math.max(0,G.cash)*.35/l.cost); return Math.max(0,Math.min(l.share,cap)); }
+function ruleWhy(l){ return RULE_KEYS.filter(k=>!l.rules[k]).map(k=>RULE_LABEL[k]); }
+const leadForAI=l=>({id:l.id, name:l.name, buyFrom:l.store, unitCost:l.cost, buyBox:l.buyBox, ourListPrice:l.ourPrice,
+  fbaFee:l.fba, prepAndInbound:l.prep, referralFee:'15%', profitPerUnit:l.profit, roi:Math.round(l.roi*100)+'%', bsr:l.bsr,
+  monthlySalesLast3Months:l.salesHist, lastMonthSales:l.monthly, fbaSellers:l.sellers, amazonOnListing:l.amazon, estMonthlyShare:l.share, maxUnitsAt35pctCash:Math.floor(Math.max(0,G.cash)*.35/l.cost)});
+
+// ================= AI brains (Claude via the page's sample capability) =================
+let AI=null, aiReady=false, aiPauseUntil=0, aiActive=0; const aiWaiters=[], aiLog=[]; let lastAIStart=0;
+const AI_ENABLED=false;   // AI brains switched off: agents run on Royce's rules only (no Claude usage)
+setTimeout(()=>{ aiReady=true; renderSheetSoon(); updStats(); },0);
+const aiAvailable=()=>AI_ENABLED && !!AI && G.aiOn && Date.now()>=aiPauseUntil;
+function aiSlot(){ return new Promise(res=>{ const go=()=>{ const wait=Math.max(0,700-(Date.now()-lastAIStart)); setTimeout(()=>{ lastAIStart=Date.now(); aiActive++; res(); },wait); };
+  if(aiActive<2) go(); else aiWaiters.push(go); }); }
+function aiRelease(){ aiActive--; const n=aiWaiters.shift(); if(n) n(); }
+const HARD_OFF=['not_granted','sampling_disabled','not_declared','capability_disabled','capability_removed'];
+async function think(agent,label,prompt,tier){
+  const entry={id:G.nid++, who:agent.name, color:agent.shirt, label, prompt, status:'waiting', start:Date.now(), day:G.day};
+  aiLog.unshift(entry); if(aiLog.length>60) aiLog.pop(); renderSheetSoon();
+  await aiSlot(); entry.status='thinking'; renderSheetSoon();
+  try{ const out=await AI.json(prompt,{modelTier:tier||'quick', cache:false}); entry.status='done'; entry.out=out; G.aiCalls++; return {out, entry}; }
+  catch(e){ entry.status='error'; entry.err=(e&&e.code)||'error';
+    if(HARD_OFF.includes(entry.err)){ G.aiOn=false; notify('🧠 Claude isn’t allowed in this view, so AI brains are off. Agents are using backup rules.'); }
+    else if(entry.err==='rate_limited'){ aiPauseUntil=Date.now()+60000; notify('🧠 Claude asked us to slow down. Agents use backup rules for 1 minute.'); }
+    throw e; }
+  finally{ entry.ms=Date.now()-entry.start; aiRelease(); renderSheetSoon(); updStats(); }
+}
+const INTRO=(n,r)=>`You are ${n}, the ${r} AI agent at Global General Needs LLC, an Amazon FBA online-arbitrage business owned by Royce. This is a test run with pretend money and a simulated market, but treat it like real work. Be concise and specific.`;
+const RULES_TEXT=`Royce's requirements: (1) sales rank (BSR) 100,000 or better; (2) Amazon itself is not selling on the listing; (3) at least 2 other FBA sellers; (4) our price no more than 3% above the Buy Box; (5) ROI 25%+; (6) sales history steady, not falling (last month at least 70% of the 3-month average); (7) no IP problems (Ivy checks). Monthly share = last month's sales ÷ (FBA sellers + 1); size orders from about one month of share, using last month's sales. Agents never buy anything: Royce approves every purchase.`;
+const S=(v,n=300)=>String(v==null?'':v).slice(0,n);
+
+// ================= task handlers =================
+// task = {kind, title, dur, ref?, data?}   (transient runtime fields live under task._)
+const TASKS={
+  hunt:{tier:'default',
+    begin(tk){ const used=new Set(); const all=Array.from({length:20},()=>makeCandidate(used));
+      const fails={}; for(const l of all) for(const w of ruleWhy(l)) fails[w]=(fails[w]||0)+1;
+      tk.data={cands:all.filter(passesAll), checked:all.length, fails}; },
+    skipAI:tk=>!tk.data.cands.length,
+    prompt:tk=>`${INTRO('Scout','Product Scout')}\n${RULES_TEXT}\nCash available: ${$$(G.cash)}.\nYour tools checked ${tk.data.checked} products today. The code already removed every product that breaks a requirement, so ALL of these ${tk.data.cands.length} pass requirements 1-6 (JSON):\n${JSON.stringify(tk.data.cands.map(leadForAI))}\n\nRank them best first (up to 5) for Royce's report. For each, suggest a quantity: about one month of share based on last month's sales, never above maxUnitsAt35pctCash, at least 1. Reply with only JSON: {"summary":"1-2 sentences to Royce","picks":[{"id":number,"qty":number,"note":"1-2 sentences citing the numbers (BSR, sales history, share, ROI)"}]}`,
+    parse(tk,ai){ const seen=new Set(), picks=[];
+      for(const p of (ai&&ai.picks)||[]){ const l=tk.data.cands.find(c=>c.id===+p.id); if(!l||seen.has(l.id)||!passesAll(l)) continue; seen.add(l.id);
+        const cap=Math.max(0,Math.floor(G.cash*.35/l.cost)); let q=Math.round(+p.qty||0); if(q<1) q=suggestQty(l);
+        picks.push({id:l.id, qty:Math.max(0,Math.min(cap,q)), note:S(p.note)}); }
+      if(!picks.length) throw 0; return {summary:S(ai.summary,400), picks:picks.slice(0,5)}; },
+    fallback(tk){ const top=[...tk.data.cands].sort((a,b)=>b.roi-a.roi).slice(0,5);
+      return {summary:top.length?`Backup rules: ${top.length} of ${tk.data.checked} products passed every requirement, ranked by ROI.`:'', picks:top.map(l=>({id:l.id, qty:suggestQty(l), note:`BSR #${l.bsr.toLocaleString()}, sales ${l.salesHist.join(' → ')}/mo, share ~${l.share}/mo, ROI ${Math.round(l.roi*100)}%.`}))}; },
+    apply(tk,res,src){ const leads=res.picks.map(p=>{ const l=tk.data.cands.find(c=>c.id===p.id); l.scout={verdict:'recommend',note:p.note,src}; l.qty=p.qty; return l; });
+      const summary = leads.length ? res.summary : `I checked ${tk.data.checked} products today and none met every requirement, so there's nothing to buy. Biggest reasons: ${Object.entries(tk.data.fails).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>`${k} (${v})`).join(', ')}.`;
+      G.pendingReport={id:G.nid++, leads, summary, src:leads.length?src:'rules', day:G.day, checked:tk.data.checked, fails:tk.data.fails, onDemand:!!tk.onDemand, rexDone:!leads.length, ivyDone:!leads.length}; nextCheck(); }},
+  history:{
+    prompt:tk=>{ const pr=G.pendingReport; return `${INTRO('Rex','Product Research')}\nFor each product below you have 12 weeks of history (oldest → newest): the Buy Box price each week and how many FBA sellers were on the listing. Judge whether the price is stable enough for online arbitrage, or whether it looks like a price war / crash is coming that would wipe out the margin (falling prices, sellers piling in, big swings).\n${JSON.stringify(pr.leads.map(l=>({id:l.id,name:l.name,unitCost:l.cost,weeklyBuyBox:l.hist,weeklyFbaSellers:l.offers})))}\nReply with only JSON: {"items":[{"id":number,"stable":true|false,"note":"one sentence citing the trend"}]}`; },
+    parse(tk,ai){ const pr=G.pendingReport; const out={}; for(const i of (ai&&ai.items)||[]){ if(pr.leads.some(l=>l.id===+i.id)) out[+i.id]={stable:!!i.stable, note:S(i.note)}; } if(!Object.keys(out).length) throw 0; return out; },
+    fallback(){ const out={}; for(const l of G.pendingReport.leads){ const d=(l.hist[11]-l.hist[0])/l.hist[0]; out[l.id]={stable:!l.volatile, note:`Price ${d<0?'down':'up'} ${Math.abs(Math.round(d*100))}% over 12 weeks; sellers ${l.offers[0]}→${l.offers[11]}.`}; } return out; },
+    apply(tk,res,src){ const pr=G.pendingReport; for(const l of pr.leads) l.rex={...(res[l.id]||{stable:!l.volatile,note:'No read.'}),src}; pr.rexDone=true; nextCheck(); }},
+  ip:{
+    prompt:tk=>`${INTRO('Ivy','Compliance')}\nFor each product, judge the risk of an IP complaint (which can freeze our inventory) if we resell it on Amazon.\n${JSON.stringify(G.pendingReport.leads.map(l=>({id:l.id,name:l.name,...l.ipInfo})))}\nReply with only JSON: {"items":[{"id":number,"risk":"low"|"medium"|"high","note":"one sentence"}]}`,
+    parse(tk,ai){ const out={}; for(const i of (ai&&ai.items)||[]){ if(G.pendingReport.leads.some(l=>l.id===+i.id)) out[+i.id]={risk:['low','medium','high'].includes(i.risk)?i.risk:'medium', note:S(i.note)}; } if(!Object.keys(out).length) throw 0; return out; },
+    fallback(){ const out={}; for(const l of G.pendingReport.leads) out[l.id]={risk:l.ip?'high':'low', note:`${l.ipInfo.brand}; ${l.ipInfo.complaintReports} complaint report(s).`}; return out; },
+    apply(tk,res,src){ const pr=G.pendingReport; for(const l of pr.leads){ l.ivy={...(res[l.id]||{risk:'medium',note:'No read.'}),src}; l.ipFail=l.ivy.risk==='high'; } pr.ivyDone=true; nextCheck(); }},
+  order:{
+    prompt:tk=>{ const p=P(tk.ref); return `${INTRO('Stocky','Purchasing & 3PL')}\nRoyce approved this purchase. Write the purchase order and a status line for him. Everything ships from the store to our 3PL first (for the paper trail), then to Amazon FBA.\n${JSON.stringify({product:p.name,store:p.lead.store,units:p.qty,unitCost:p.cost,total:r2(p.qty*p.cost),cashLeftAfter:r2(G.cash),dailyAgentCosts:agents.length*WAGE,otherOpenOrders:G.purchases.filter(x=>['order','to3pl'].includes(x.stage)).length-1})}\nIf cash left is under 5 days of agent costs, add a short warning. Reply with only JSON: {"po":"PO-number you make up","note":"one sentence status","warning":"" }`; },
+    parse(tk,ai){ if(!ai||!ai.note) throw 0; return {po:S(ai.po,30)||('PO-'+tk.ref), note:S(ai.note), warning:S(ai.warning)}; },
+    fallback(tk){ const p=P(tk.ref); return {po:'PO-'+(1000+p.id), note:`Ordered ${p.qty}× from ${p.lead.store}, shipping to the 3PL.`, warning:G.cash<agents.length*WAGE*5?'Cash is getting low.':''}; },
+    apply(tk,res,src){ const p=P(tk.ref); if(!p) return; p.po=res.po; addNote(p,'Stocky',res.note+(res.warning?' ⚠️ '+res.warning:''),src);
+      p.stage='to3pl'; p.t=1; log(`📦 Stocky sent ${res.po}: ${p.qty}× ${p.name} → 3PL`); }},
+  ship:{
+    prompt:tk=>{ const p=P(tk.ref); return `${INTRO(tk._who||'Lexi','Shipments & Listings')}\nOur 3PL received this order. Plan the FBA inbound shipment: estimate how many boxes, and list the prep steps (FNSKU labels, poly bags, bubble wrap, bundling, etc.) that fit this product.\n${JSON.stringify({product:p.name,units:p.qty})}\nReply with only JSON: {"boxes":number,"prep":["short step", "..."],"note":"one sentence status for Royce"}`; },
+    parse(tk,ai){ if(!ai||!Array.isArray(ai.prep)) throw 0; return {boxes:Math.max(1,Math.round(+ai.boxes||1)), prep:ai.prep.slice(0,5).map(x=>S(x,80)), note:S(ai.note)}; },
+    fallback(tk){ const p=P(tk.ref); return {boxes:Math.max(1,Math.ceil(p.qty/24)), prep:['FNSKU label on every unit','Box labels on each carton'], note:`Shipment created for ${p.qty} units.`}; },
+    apply(tk,res,src){ const p=P(tk.ref); if(!p) return; p.boxes=res.boxes; p.prep=res.prep; addNote(p,tk._who||'Lexi',`${res.note} (${res.boxes} box${res.boxes>1?'es':''}: ${res.prep.join('; ')})`,src);
+      p.stage='toFBA'; p.t=1.5; log(`🚚 ${p.name} shipped to Amazon FBA`); }},
+  reprice:{
+    begin(tk){ tk.data={ids:G.purchases.filter(p=>p.stage==='live').map(p=>p.id)}; },
+    prompt:tk=>`${INTRO('Penny','Pricing')}\nSet today's price for each live product. Goal: win the Buy Box and keep selling while staying profitable. Don't race to the bottom; never go below break-even unless stock is stuck. If Amazon itself is on the listing, we rarely win.\n${JSON.stringify(tk.data.ids.map(P).filter(Boolean).map(p=>({id:p.id,name:p.name,ourPrice:p.price,breakEven:r2(breakEven(p)),unitCost:p.cost,competitorOffers:p.comps.map(c=>`${c.type} $${c.price}`),unitsLeft:p.stock,soldYesterday:p.soldYday||0,daysLive:Math.floor(now()-p.liveAt)})))}\nReply with only JSON: {"items":[{"id":number,"price":number,"note":"one short sentence why"}]}`,
+    parse(tk,ai){ const out={}; for(const i of (ai&&ai.items)||[]){ const p=P(+i.id); const pr=+i.price; if(p&&pr>0) out[p.id]={price:pr,note:S(i.note)}; } if(!Object.keys(out).length) throw 0; return out; },
+    fallback(tk){ const out={}; for(const id of tk.data.ids){ const p=P(id); if(!p) continue; const L=lowComp(p);
+      out[id]={price:Math.max(r2(breakEven(p)+.25), isFinite(L)?r2(L-.01):p.price), note:'Matched the lowest FBA offer (backup rule).'}; } return out; },
+    apply(tk,res,src){ for(const id of tk.data.ids){ const p=P(id); if(!p||p.stage!=='live') continue; const r=res[id]; if(!r) continue;
+      const L=lowComp(p), hi=isFinite(L)?L*1.25:p.lead.ourPrice*1.3; const old=p.price;
+      p.price=r2(Math.min(hi,Math.max(breakEven(p)*.8,r.price))); p.lastRepriced=now(); p.pennyNote={text:r.note,src,day:G.day};
+      if(Math.abs(p.price-old)>=.01) addNote(p,'Penny',`${$$(old)} → ${$$(p.price)}: ${r.note}`,src); } }},
+  support:{
+    begin(tk){ tk.data={ids:G.messages.filter(m=>!m.done).slice(0,3).map(m=>m.id)}; },
+    prompt:tk=>`${INTRO('Hana','Customer Support')}\nAnswer these Amazon buyer messages. For each, pick an action: "refund" (we refund the buyer), "replace" (send a new unit from our stock), or "reply" (message only). Be fair to the buyer, follow Amazon's rules (be polite, no asking for reviews), and protect the business.\n${JSON.stringify(tk.data.ids.map(id=>G.messages.find(m=>m.id===id)).filter(Boolean).map(m=>{ const p=P(m.pid); return {id:m.id,product:m.product,pricePaid:m.price,message:m.text,unitsInStock:p?p.stock:0}; }))}\nReply with only JSON: {"items":[{"id":number,"action":"refund"|"replace"|"reply","reply":"the message to the buyer, 1-3 sentences"}]}`,
+    parse(tk,ai){ const out={}; for(const i of (ai&&ai.items)||[]){ if(tk.data.ids.includes(+i.id)) out[+i.id]={action:['refund','replace','reply'].includes(i.action)?i.action:'reply', reply:S(i.reply,500)}; } if(!Object.keys(out).length) throw 0; return out; },
+    fallback(tk){ const out={}; for(const id of tk.data.ids){ const m=G.messages.find(x=>x.id===id); if(!m) continue;
+      out[id]={action:m.kind==='late'||m.kind==='question'||m.kind==='happy'?'reply':'refund', reply:'Thanks for reaching out. We’re sorry about this and are taking care of it right away.'}; } return out; },
+    apply(tk,res,src){ for(const id of tk.data.ids){ const m=G.messages.find(x=>x.id===id); const r=res[id]; if(!m||!r) continue; resolveMessage(m,r.action,r.reply,src,'Hana'); }
+      if(G.messages.some(m=>!m.done)) queueSupport();
+  if(G.lotHunting && !anyKind('lots')) G.lotHunting=false;
+  if(!G.lots) G.lots=[]; }},
+  brief:{
+    prompt:tk=>{ const r=ROLES.find(x=>x.key===tk.who); return `${INTRO(r.name,r.role)}\nRoyce tapped you and asked for a quick report on your area of the business. Use only this data (it is current):\n${JSON.stringify(briefData(tk.who))}\nReply with only JSON: {"title":"short title","summary":"2-3 sentences","bullets":["specific point","..."]}`; },
+    parse(tk,ai){ if(!ai||!ai.summary) throw 0; return {title:S(ai.title,80), summary:S(ai.summary,700), bullets:(Array.isArray(ai.bullets)?ai.bullets:[]).slice(0,6).map(x=>S(x,240))}; },
+    fallback(tk){ return briefFallback(tk.who); },
+    apply(tk,res,src){ const r=ROLES.find(x=>x.key===tk.who); const rp={id:G.nid++, type:'brief', from:r.name, role:r.role, who:r.key, read:false, src, day:G.day, ...res};
+      G.reports.unshift(rp); trimReports(); notify(`📋 ${r.name} sent you a report`); openReportSoon(rp.id); markSave(); }},
+  lots:{
+    begin(tk){ const all=Array.from({length:12},makeLot); const fails={}; for(const l of all) for(const k of LOT_KEYS) if(!l.rules[k]) fails[LOT_LABEL[k]]=(fails[LOT_LABEL[k]]||0)+1;
+      tk.data={pass:all.filter(lotPasses).sort((a,b)=>b.roi-a.roi).slice(0,3), checked:all.length, fails}; },
+    parse(){ throw 0; },
+    fallback(tk){ return tk.data; },
+    apply(tk,res){ G.lotHunting=false;
+      for(const l of res.pass) l.note=`${l.condition}, ${l.units} units from ${l.source}. All-in ${$0(l.allIn)} is ${Math.round(l.pctRetail*100)}% of retail; est. eBay resale ${$0(l.estResale)} → profit ~${$0(l.profit)} (${Math.round(l.roi*100)}% ROI).`;
+      const rp={id:G.nid++, type:'lots', from:'Sal', read:false, day:G.day, src:'rules', lots:res.pass, checked:res.checked, fails:res.fails};
+      G.reports.unshift(rp); trimReports();
+      notify(res.pass.length?`🏗️ Sal found ${res.pass.length} liquidation lot${res.pass.length>1?'s':''} that meet your lot rules`:`🏗️ Sal checked ${res.checked} lots: none met your lot rules`);
+      if(tk.onDemand) openReportSoon(rp.id); markSave(); }},
+  bid:{
+    parse(){ throw 0; }, fallback(){ return {}; },
+    apply(tk){ const L=lotById(tk.ref); if(!L) return;
+      if(Math.random()<.6){ L.stage='freight'; L.t=2; notify(`🏆 Won the auction: ${L.name}! Freight is heading to the warehouse.`); }
+      else { L.stage='lost'; G.cash+=L.allIn; G.total.spent-=L.allIn; notify(`😕 Outbid on ${L.name}. ${$0(L.allIn)} returned to cash.`); }
+      markSave(); }},
+  listlot:{
+    parse(){ throw 0; }, fallback(){ return {}; },
+    apply(tk,res,src){ const L=lotById(tk.ref); if(!L||L.stage!=='arrived') return;
+      L.sellable=Math.max(1,Math.round(L.units*Math.min(1,L.lot.truth+.15))); L.unitPrice=r2(L.lot.estResale/L.units*L.lot.truth/Math.min(1,L.lot.truth+.15));
+      L.stage='selling'; L.lastTended=now(); L.listedAt=now();
+      log(`🏷️ Eli listed ${L.sellable} items from ${L.name} on eBay`); markSave(); }},
+  ebaydaily:{
+    parse(){ throw 0; }, fallback(){ return {}; },
+    apply(){ for(const L of G.lots) if(L.stage==='selling'){ L.lastTended=now(); } }},
+  wmlist:{
+    parse(){ throw 0; }, fallback(){ return {}; },
+    apply(tk){ const p=P(tk.ref); if(!p||p.walmart||!['live','done'].includes(p.stage)) return; if(p.stage==='done') return;
+      p.walmart={sold:0, listedDay:G.day}; addNote(p,'Wally','Listed on Walmart Marketplace (WFS) at the same price.','rules'); log(`🟦 Wally listed ${p.name} on Walmart`); markSave(); }},
+  daily:{
+    prompt:tk=>`${INTRO('Bea','Bookkeeping')}\nWrite Royce's end-of-day money report from these numbers. Total worth = cash + pending payout + inventory at cost. He started with $1,000. Give 2-3 practical tips based on the numbers (cash flow, what's selling, pricing, when to buy more).\n${JSON.stringify(tk.data)}\nReply with only JSON: {"headline":"short headline","summary":"2-3 sentences","tips":["...","..."]}`,
+    parse(tk,ai){ if(!ai||!ai.summary) throw 0; return {headline:S(ai.headline,90), summary:S(ai.summary,600), tips:(Array.isArray(ai.tips)?ai.tips:[]).slice(0,3).map(x=>S(x,200))}; },
+    fallback(tk){ const d=tk.data, worth=d.cash+d.pendingPayout+d.inventoryCost;
+      return {headline:`Day ${d.day}: ${d.unitsSold} sold, worth ${$0(worth)}`, summary:`We sold ${d.unitsSold} units for ${$$(d.sales)} (${$$(d.afterFees)} after fees). Cash ${$$(d.cash)}, payout pending ${$$(d.pendingPayout)}, inventory ${$0(d.inventoryCost)} at cost.`,
+        tips:[d.inventoryUnits===0?'Approve products from Scout’s reports so we have something to sell.':'Keep Penny repricing daily so we keep the Buy Box.', d.cash<100?'Cash is low. Wait for the next payout before buying more.':'Spread buys across several products.']}; },
+    apply(tk,res,src){ G.reports.unshift({id:G.nid++, type:'daily', from:'Bea', read:false, src, ...res, d:tk.data}); trimReports(); notify(`📊 Bea sent your Day ${tk.data.day} money report`); }},
+};
+function P(id){ return G.purchases.find(p=>p.id===id); }
+function addNote(p,who,text,src){ (p.notes=p.notes||[]).unshift({who,text,src,day:G.day}); if(p.notes.length>6) p.notes.pop(); }
+function trimReports(){ if(G.reports.length>30) G.reports.length=30; }
+function queueTask(key,task,fallbackKey,slow=1.6){
+  let a=hiredA(key);
+  if(!a && fallbackKey){ a=hiredA(fallbackKey); if(a){ task.dur*=slow; task.title+=' (covering)'; } }
+  if(!a){ runInstant(task); return; }
+  a.queue.push(task); updStats();
+}
+function runInstant(task){ const h=TASKS[task.kind]; task._={}; if(h.begin) h.begin(task); h.apply(task,h.fallback(task),'rules'); }
+function nextCheck(){
+  const pr=G.pendingReport; if(!pr) return;
+  if(!pr.rexDone && hiredA('rex')) return queueTask('rex',{kind:'history',title:'Check price history',dur:7});
+  pr.rexDone=true;
+  if(!pr.ivyDone && hiredA('ivy')) return queueTask('ivy',{kind:'ip',title:'Check IP risk',dur:7});
+  pr.ivyDone=true;
+  G.reports.unshift({...pr, type:'products', from:'Scout', read:false}); trimReports();
+  G.pendingReport=null; G.hunting=false;
+  notify(pr.leads.length?`📋 Scout found ${pr.leads.length} product${pr.leads.length>1?'s':''} that meet your requirements`:`📋 Scout checked ${pr.checked} products: none met your requirements today`);
+  if(pr.onDemand) openReportSoon(pr.id);
+  const s=hiredA('scout'); if(s){ s.bubble='Report sent, boss! 📋'; s.bubbleT=2.5; }
+  markSave();
+}
+function queueHunt(){ G.hunting=true; G.nextHuntAt=now()+0.5; queueTask('scout',{kind:'hunt',title:'Review today’s product leads',dur:14}); }
+function queueSupport(){ const h=hiredA('hana'); if(!h) return; if(h.queue.some(t=>t.kind==='support')||(h.task&&h.task.kind==='support')) return;
+  queueTask('hana',{kind:'support',title:'Answer buyer messages',dur:6}); }
+function queueReprice(){ const pn=hiredA('penny');
+  if(pn && (pn.queue.some(t=>t.kind==='reprice')||(pn.task&&pn.task.kind==='reprice'))) return;
+  if(!G.purchases.some(p=>p.stage==='live')) return;
+  queueTask('penny',{kind:'reprice',title:'Reprice live products',dur:5}); }
+
+// ---------- liquidation lots ----------
+const LOT_REQ={maxPctRetail:.25, minROI:.5};
+const LOT_KEYS=['pct','roi','cond','manifest'];
+const LOT_LABEL={pct:'all-in over 25% of retail',roi:'est. ROI under 50%',cond:'salvage / untested',manifest:'no full manifest'};
+const LOT_SOURCES=['Liquidation.com','B-Stock','Salvex','BULQ','Whatnot'];
+const LOT_CATS=['Home & kitchen','Toys & games','Small electronics','Apparel & shoes','Tools & hardware','Mixed merchandise','Health & beauty'];
+const LOT_COND=[{c:'New overstock',rec:.5},{c:'Shelf pulls',rec:.42},{c:'Customer returns',rec:.3},{c:'Salvage / untested',rec:.14}];
+function makeLot(){
+  const cond=pick(LOT_COND), units=Math.round(rr2(20,140)), retail=Math.round(units*rr2(12,55));
+  const bid=Math.round(retail*rr2(.04,.26)), freight=Math.round(rr2(90,360)), allIn=Math.round(bid*1.12+freight);
+  const estResale=Math.round(retail*cond.rec*rr2(.85,1.15)), fees=estResale*.1325+units*4, profit=Math.round(estResale-fees-allIn);
+  const l={id:G.nid++, source:pick(LOT_SOURCES), category:pick(LOT_CATS), condition:cond.c, units, retail, bid, freight, allIn, estResale, profit,
+    roi:r2(profit/allIn), pctRetail:r2(allIn/retail), manifest:Math.random()<.8?'Full manifest':'Partial manifest',
+    truth:r2(rr2(.6,1.15)*(cond.c.startsWith('Salvage')?.8:1)), decision:null};
+  l.rules={pct:l.pctRetail<=LOT_REQ.maxPctRetail, roi:l.roi>=LOT_REQ.minROI, cond:!cond.c.startsWith('Salvage'), manifest:l.manifest==='Full manifest'};
+  return l;
+}
+const lotPasses=l=>LOT_KEYS.every(k=>l.rules[k]);
+const lotById=id=>(G.lots||[]).find(L=>L.id===id);
+function approveLot(rep,l){
+  if(l.allIn>G.cash+1e-6) return;
+  G.cash-=l.allIn; G.total.spent+=l.allIn; l.decision={bid:true};
+  const L={id:G.nid++, lot:l, name:`${l.category} lot (${l.units})`, allIn:l.allIn, units:l.units, stage:'bidding', t:0, sold:0, sellable:0, revenue:0, net:0, lastTended:0};
+  G.lots.unshift(L); log(`🔨 You approved a bid on ${L.name} (${$0(l.allIn)} held)`);
+  queueTask('liq',{kind:'bid',title:'Place bid: '+L.name,dur:6,ref:L.id});
+  markSave(); updStats();
+}
+function queueWalmart(p){ if(!hiredA('walmart')||p.walmart) return; const w=hiredA('walmart');
+  if(w.queue.some(x=>x.kind==='wmlist'&&x.ref===p.id)||(w.task&&w.task.kind==='wmlist'&&w.task.ref===p.id)) return;
+  queueTask('walmart',{kind:'wmlist',title:'List on Walmart: '+p.name,dur:6,ref:p.id}); }
+function queueEbayDaily(){ const e=hiredA('ebay'); if(!e) return; if(e.queue.some(x=>x.kind==='ebaydaily')||(e.task&&e.task.kind==='ebaydaily')) return;
+  queueTask('ebay',{kind:'ebaydaily',title:'Answer offers & ship eBay orders',dur:6}); }
+function simLots(dd){
+  for(const L of G.lots||[]){
+    if(L.stage==='freight'){ L.t-=dd; if(L.t<=0){ L.stage='arrived'; notify(`🚛 ${L.name} arrived at the warehouse`);
+      if(hiredA('ebay')) queueTask('ebay',{kind:'listlot',title:'List lot on eBay: '+L.name,dur:8,ref:L.id}); else log(`⚠️ ${L.name} is waiting. Hire Eli (eBay) to sell it.`); markSave(); } }
+    else if(L.stage==='selling'){
+      const tended=now()-L.lastTended<=1.5 ? 1 : .3;
+      let exp=(L.sellable-L.sold)*.075*tended*dd;
+      while(exp>0 && L.sold<L.sellable){ if(Math.random()<Math.min(1,exp)){ const price=r2(L.unitPrice*rr2(.8,1.12)), net=price*(1-.1325)-4;
+          L.sold++; L.revenue+=price; L.net+=net; G.pending+=net; G.total.units++; G.total.revenue+=price; G.total.net+=net; G.today.units++; G.today.revenue+=price; G.today.net+=net; }
+        exp-=1; }
+      if(L.sold>=L.sellable){ L.stage='done'; notify(`🎉 Sold through ${L.name}! Profit ${$0(L.net-L.allIn)}`); markSave(); }
+    }
+  }
+}
+// ---------- asking an agent for a report ----------
+function briefData(key){
+  const recentLeads=G.reports.filter(r=>r.type==='products').slice(0,3).flatMap(r=>r.leads);
+  const live=G.purchases.filter(p=>p.stage==='live');
+  switch(key){
+    case 'rex': return {leadsChecked:recentLeads.filter(l=>l.rex).map(l=>({name:l.name,stable:l.rex.stable,note:l.rex.note,decision:l.decision?(l.decision.skip?'skipped':'bought '+l.decision.qty):'waiting'})),
+      liveProducts:live.map(p=>({name:p.name,startingBuyBox:p.lead.buyBox,lowestOfferNow:isFinite(lowComp(p))?lowComp(p):null}))};
+    case 'ivy': return {leadsChecked:recentLeads.filter(l=>l.ivy).map(l=>({name:l.name,risk:l.ivy.risk,note:l.ivy.note})), suppressedProducts:G.purchases.filter(p=>p.stage==='suppressed').map(p=>({name:p.name,unitsStuck:p.stock}))};
+    case 'stocky': return {cash:r2(G.cash), openOrders:G.purchases.filter(p=>['order','to3pl','at3pl'].includes(p.stage)).map(p=>({name:p.name,units:p.qty,stage:p.stage,po:p.po||null,daysLeft:p.t>0?r2(p.t):null})), totalSpentOnInventory:r2(G.total.spent)};
+    case 'lexi': return {atThe3PL:G.purchases.filter(p=>p.stage==='at3pl').map(p=>({name:p.name,units:p.qty})), headingToAmazon:G.purchases.filter(p=>p.stage==='toFBA').map(p=>({name:p.name,units:p.qty,boxes:p.boxes||null,daysLeft:r2(p.t)}))};
+    case 'penny': return {liveProducts:live.map(p=>({name:p.name,ourPrice:p.price,lowestCompetitor:isFinite(lowComp(p))?lowComp(p):null,breakEven:r2(breakEven(p)),unitsLeft:p.stock,soldYesterday:p.soldYday||0,lastNote:p.pennyNote?p.pennyNote.text:null}))};
+    case 'hana': return {openMessages:G.messages.filter(m=>!m.done).map(m=>({product:m.product,message:m.text})), recentlyHandled:G.messages.filter(m=>m.done).slice(-8).map(m=>({product:m.product,action:m.action,kind:m.kind})), refundsSoFar:r2(G.total.refunds)};
+    case 'liq': return {lotsBidOn:G.lots.map(L=>({lot:L.name,stage:L.stage,allIn:L.allIn})), lastReport:(G.reports.find(r=>r.type==='lots')||{}).lots?.map(l=>({lot:l.category,units:l.units,roi:l.roi,decision:l.decision?(l.decision.skip?'skipped':'bid'):'waiting'}))||[]};
+    case 'ebay': return {sellingLots:G.lots.filter(L=>L.stage==='selling').map(L=>({lot:L.name,listed:L.sellable,sold:L.sold,revenue:r2(L.revenue),allIn:L.allIn})), waitingToList:G.lots.filter(L=>L.stage==='arrived').length};
+    case 'walmart': return {listedOnWalmart:G.purchases.filter(p=>p.walmart).map(p=>({name:p.name,walmartSold:p.walmart.sold,unitsLeft:p.stock})), liveNotListed:G.purchases.filter(p=>p.stage==='live'&&!p.walmart).length};
+    case 'bea': return {day:G.day, today:{unitsSold:G.today.units,sales:r2(G.today.revenue),afterFees:r2(G.today.net)}, cash:r2(G.cash), pendingPayout:r2(G.pending), nextPayoutInDays:G.nextPayout-G.day,
+      inventoryUnits:stockUnits(), inventoryCost:r2(stockValue()), totalWorth:r2(G.cash+G.pending+stockValue()), startedWith:1000, sinceStart:G.total, agentsOnPayroll:agents.length, costPerDay:agents.length*WAGE};
+  }
+  return {};
+}
+function briefFallback(key){
+  const d=briefData(key), list=(arr,f)=>arr&&arr.length?arr.slice(0,6).map(f):['Nothing to report yet.'];
+  switch(key){
+    case 'rex': return {title:'Price-history check-in',summary:`I've checked ${d.leadsChecked.length} recent leads.`,bullets:list(d.leadsChecked,l=>`${l.name}: ${l.stable?'stable':'unstable'} (${l.decision})`)};
+    case 'ivy': return {title:'Compliance check-in',summary:`${d.leadsChecked.length} leads checked, ${d.suppressedProducts.length} product(s) suppressed.`,bullets:list(d.leadsChecked,l=>`${l.name}: ${l.risk} IP risk`)};
+    case 'stocky': return {title:'Orders status',summary:`${d.openOrders.length} open order(s). Cash ${$$(d.cash)}.`,bullets:list(d.openOrders,o=>`${o.name}: ${o.units} units, ${o.stage}${o.daysLeft?`, ~${o.daysLeft} days`:''}`)};
+    case 'lexi': return {title:'Shipments status',summary:`${d.atThe3PL.length} at the 3PL, ${d.headingToAmazon.length} heading to Amazon.`,bullets:list([...d.atThe3PL,...d.headingToAmazon],s=>`${s.name}: ${s.units} units`)};
+    case 'penny': return {title:'Pricing check-in',summary:`${d.liveProducts.length} live product(s).`,bullets:list(d.liveProducts,p=>`${p.name}: ours ${$$(p.ourPrice)} vs lowest ${p.lowestCompetitor?$$(p.lowestCompetitor):'n/a'}, ${p.unitsLeft} left`)};
+    case 'hana': return {title:'Support check-in',summary:`${d.openMessages.length} open message(s). Refunds so far ${$$(d.refundsSoFar)}.`,bullets:list(d.recentlyHandled,m=>`${m.product}: ${m.action}`)};
+    case 'liq': return {title:'Liquidation check-in',summary:`${d.lotsBidOn.length} lot(s) bought or bid on.`,bullets:list(d.lotsBidOn,l=>`${l.lot}: ${l.stage} (all-in ${$0(l.allIn)})`)};
+    case 'ebay': return {title:'eBay check-in',summary:`${d.sellingLots.length} lot(s) selling, ${d.waitingToList} waiting to be listed.`,bullets:list(d.sellingLots,l=>`${l.lot}: sold ${l.sold}/${l.listed}, ${$0(l.revenue)} sales vs ${$0(l.allIn)} cost`)};
+    case 'walmart': return {title:'Walmart check-in',summary:`${d.listedOnWalmart.length} product(s) listed on Walmart, ${d.liveNotListed} live on Amazon but not on Walmart yet.`,bullets:list(d.listedOnWalmart,p=>`${p.name}: ${p.walmartSold} sold on Walmart, ${p.unitsLeft} left`)};
+    case 'bea': return {title:`Money check-in (Day ${d.day})`,summary:`Cash ${$$(d.cash)}, pending payout ${$$(d.pendingPayout)}, inventory ${$$(d.inventoryCost)}. Total worth ${$$(d.totalWorth)} vs $1,000 start.`,bullets:[`Sold ${d.today.unitsSold} today for ${$$(d.today.sales)}`,`Payroll ${$$(d.costPerDay)}/day`]};
+  }
+  return {title:'Report',summary:'Nothing to report.',bullets:[]};
+}
+function askReport(a){
+  if(!a||a.boss) return;
+  if(a.key==='liq'){
+    const cur=a.task&&a.task.kind==='lots', qi=a.queue.findIndex(x=>x.kind==='lots');
+    if(cur||qi>=0){ if(qi>0){ const [x]=a.queue.splice(qi,1); a.queue.unshift(x); } (cur?a.task:a.queue[0]).onDemand=true; a.bubble='Already checking lots! 🏗️'; }
+    else { G.lotHunting=true; a.queue.unshift({kind:'lots',title:'Check liquidation lots (you asked)',dur:9,onDemand:true}); a.bubble='Checking the auctions now 🏗️'; }
+  } else if(a.key==='scout'){
+    const cur=a.task&&a.task.kind==='hunt', qi=a.queue.findIndex(x=>x.kind==='hunt');
+    if(cur||qi>=0){ if(qi>0){ const [x]=a.queue.splice(qi,1); a.queue.unshift(x); } (cur?a.task:a.queue[0]).onDemand=true; a.bubble='Already hunting, boss! 🔍'; }
+    else if(G.pendingReport){ G.pendingReport.onDemand=true; a.bubble='Rex & Ivy are checking my picks now!'; }
+    else { G.hunting=true; a.queue.unshift({kind:'hunt',title:'Product hunt (you asked)',dur:10,onDemand:true}); a.bubble='On it! Checking products now 🔍'; }
+  } else {
+    if(a.queue.some(x=>x.kind==='brief')||(a.task&&a.task.kind==='brief')){ a.bubble='Working on your report!'; }
+    else { a.queue.unshift({kind:'brief',title:'Report for Royce',dur:4,who:a.key}); a.bubble='Report coming up! 📋'; }
+  }
+  a.bubbleT=2.5; if(isSlacking(a)) sendToWork(a,false);
+  log(`📋 You asked ${a.name} for a report`); updStats();
+}
+
+// ---------- buying ----------
+function approve(rep,l,qty){
+  const cost=qty*l.cost; if(qty<1||cost>G.cash+1e-6) return;
+  G.cash-=cost; G.total.spent+=cost; l.decision={qty};
+  const p={id:G.nid++, lead:{store:l.store,fba:l.fba,prep:l.prep,sellers:l.sellers,amazon:l.amazon,buyBox:l.buyBox,ourPrice:l.ourPrice,trueMonthly:l.trueMonthly,volatile:l.volatile,ip:l.ip},
+    name:l.name, qty, cost:l.cost, stage:'order', t:0, stock:qty, sold:0, soldYday:0, soldToday:0, revenue:0, net:0, price:l.ourPrice, comps:[], lastRepriced:0,
+    ipAt:l.ip?rr2(.4,2):null, crashAt:l.volatile?rr2(.3,1.5):null, liveAt:0, notes:[]};
+  G.purchases.unshift(p);
+  log(`🛒 You approved ${qty}× ${l.name} (${$0(cost)})`);
+  queueTask('stocky',{kind:'order',title:'Purchase order: '+l.name,dur:5,ref:p.id});
+  markSave(); renderSheet(); updStats();
+}
+function skip(rep,l){ l.decision={skip:true}; markSave(); renderSheet(); }
+
+// ---------- market ----------
+const breakEven=p=>(p.cost+p.lead.prep+p.lead.fba)/.85;
+function lowComp(p){ const xs=p.comps.filter(c=>c.type!=='FBM').map(c=>c.price); return xs.length?Math.min(...xs):Infinity; }
+function initComps(p){ const l=p.lead, bb=l.buyBox; p.comps=[];
+  for(let k=0;k<l.sellers;k++) p.comps.push({type:'FBA',price:r2(k===0?bb:bb*rr2(1.0,1.1))});
+  if(l.amazon) p.comps.push({type:'Amazon',price:r2(bb*.99)});
+  p.comps.push({type:'FBM',price:r2(bb*rr2(.88,1.0))}); }
+function buyBoxShare(p){
+  const L=lowComp(p); let f;
+  if(!isFinite(L)) f=1; else { const r=p.price/L; f = r<=1.0001?1 : r<=1.03?.55 : r<=1.08?.2 : .06; }
+  const amz=p.comps.find(c=>c.type==='Amazon'); if(amz && amz.price<=p.price*1.02) f*=.2;
+  return f;
+}
+const MSG={
+  damaged:['The {p} arrived damaged. The box was crushed and it’s cracked. Can I get a refund or replacement?','My {p} came broken. Not happy.'],
+  notdesc:['The {p} is smaller than the photos made it look. I want to return it.','This {p} isn’t what I expected from the listing.'],
+  late:['Where is my {p}? Tracking says delivered but I don’t have it.','My {p} order is late. Any update?'],
+  question:['Does the {p} come with any warranty?','Is the {p} dishwasher safe?'],
+  happy:['Love the {p}, thank you!','Fast shipping on the {p}, great seller.']};
+function makeMessage(p){ const kinds=['damaged','damaged','notdesc','late','question','happy'], kind=pick(kinds);
+  return {id:G.nid++, pid:p.id, product:p.name, price:p.price, kind, text:pick(MSG[kind]).replace('{p}',p.name), done:false, day:G.day}; }
+function resolveMessage(m,action,reply,src,who){
+  const p=P(m.pid); m.done=true; m.action=action; m.reply=reply; m.src=src; m.who=who;
+  if(action==='refund'){ G.pending-=m.price*.85; G.total.refunds+=m.price*.85; if(p && (m.kind==='notdesc'?Math.random()<.65:m.kind==='damaged'?Math.random()<.15:Math.random()<.4)){ p.stock++; if(p.stage==='done') p.stage='live'; } }
+  if(action==='replace'){ if(p&&p.stock>0){ p.stock--; if(p.stock<=0&&p.stage==='live') p.stage='done'; } else { G.pending-=m.price*.85; m.action='refund'; } }
+  if(action==='reply' && m.kind==='damaged' && Math.random()<.5){ G.pending-=m.price*.85; G.total.refunds+=m.price*.85; m.note='Buyer filed an A-to-z claim and got refunded anyway.'; }
+  G.today.returns+= (m.action==='refund'?1:0);
+  log(`💬 ${who} → ${m.product}: ${m.action}`); renderSheetSoon();
+}
+function sale(p,ch){
+  p.stock--; p.sold++; p.soldToday++; if(ch==='walmart') p.walmart.sold++; const fees=p.price*.15+p.lead.fba, net=p.price-fees;
+  p.revenue+=p.price; p.net+=net; G.pending+=net; G.total.units++; G.total.revenue+=p.price; G.total.net+=net;
+  G.today.units++; G.today.revenue+=p.price; G.today.net+=net;
+  if(Math.random()<.05){ const m=makeMessage(p);
+    if(hiredA('hana')){ G.messages.push(m); if(G.messages.length>40) G.messages.splice(0,G.messages.length-40); queueSupport(); }
+    else { G.messages.push(m); resolveMessage(m, ['late','question','happy'].includes(m.kind)?'reply':'refund','(auto-handled, no support agent)','rules','Amazon'); } }
+  if(p.stock<=0){ p.stage='done'; notify(`🎉 Sold out: ${p.name}! Profit ${$0(p.net-p.qty*(p.cost+p.lead.prep))}`); }
+}
+function simBusiness(dt){
+  const dd=dt/DAY; G.time+=dd;
+  for(const p of G.purchases){
+    if(p.stage==='to3pl'){ p.t-=dd; if(p.t<=0){ p.stage='at3pl'; log(`🏭 ${p.name} arrived at the 3PL`);
+      queueTask('lexi',{kind:'ship',title:'FBA shipment: '+p.name,dur:6,ref:p.id},'stocky'); markSave(); } }
+    else if(p.stage==='toFBA'){ p.t-=dd; if(p.t<=0){ p.stage='live'; p.liveAt=now(); p.lastRepriced=now(); initComps(p);
+      notify(`✅ ${p.name} is live on Amazon!`); queueReprice(); queueWalmart(p); markSave(); } }
+    else if(p.stage==='live'){
+      const age=now()-p.liveAt;
+      if(p.crashAt!==null && age>p.crashAt){ p.crashAt=null; for(const c of p.comps) if(c.type!=='FBM') c.price=r2(c.price*rr2(.68,.82));
+        notify(`📉 Price war on ${p.name}! Lowest offer now ${$$(lowComp(p))}`); queueReprice(); }
+      if(p.ipAt!==null && age>p.ipAt){ p.ipAt=null; if(Math.random()<.6){ p.stage='suppressed'; notify(`⚠️ IP complaint! ${p.name} was suppressed (${p.stock} units stuck)`); continue; } }
+      const perDay=p.lead.trueMonthly/(p.lead.sellers+1)*buyBoxShare(p)/30;
+      let exp=perDay*dd; while(exp>0 && p.stage==='live'){ if(Math.random()<Math.min(1,exp)) sale(p); exp-=1; }
+      if(p.walmart && p.stage==='live'){ let w=p.lead.trueMonthly/(p.lead.sellers+1)*.3/30*dd; while(w>0 && p.stage==='live'){ if(Math.random()<Math.min(1,w)) sale(p,'walmart'); w-=1; } }
+    }
+  }
+  simLots(dd);
+  if(G.time>=1){ G.time-=1; endOfDay(); }
+  if(hiredA('liq') && !G.lotHunting && !G.reports.some(r=>r.type==='lots'&&r.lots.some(l=>!l.decision)) && now()>=(G.nextLotHuntAt||0)){ G.lotHunting=true; G.nextLotHuntAt=now()+1.5; queueTask('liq',{kind:'lots',title:'Check liquidation lots',dur:12}); }
+  if(hiredA('scout') && !G.hunting && G.reports.filter(r=>r.type==='products' && r.leads.some(l=>!l.decision)).length<2 && now()>=(G.nextHuntAt||0)) queueHunt();
+}
+function endOfDay(){
+  const wages=agents.length*WAGE; G.cash-=wages; G.total.overhead+=wages;
+  const d={day:G.day, unitsSold:G.today.units, sales:r2(G.today.revenue), afterFees:r2(G.today.net), refunds:G.today.returns, agentCosts:wages,
+    cash:r2(G.cash), pendingPayout:r2(G.pending), nextPayoutInDays:G.nextPayout-G.day-1, inventoryUnits:stockUnits(), inventoryCost:r2(stockValue()),
+    sinceStart:{spentOnInventory:r2(G.total.spent),sales:r2(G.total.revenue),afterFees:r2(G.total.net),agentCosts:r2(G.total.overhead),refunds:r2(G.total.refunds)},
+    products:G.purchases.filter(p=>!['done'].includes(p.stage)).slice(0,8).map(p=>({name:p.name,stage:p.stage,price:p.price,left:p.stock,sold:p.sold}))};
+  G.today={units:0,revenue:0,net:0,returns:0}; G.day++;
+  for(const p of G.purchases){ p.soldYday=p.soldToday; p.soldToday=0;
+    if(p.stage==='live'){ for(const c of p.comps) c.price=r2(Math.max(p.cost*1.25,c.price*rr2(.975,1.025)));
+      const L=lowComp(p); if(isFinite(L) && p.price<L-.005 && Math.random()<.45){ const c=p.comps.filter(c=>c.type==='FBA').sort((a,b)=>a.price-b.price)[0]; if(c) c.price=r2(Math.max(p.cost*1.2,p.price-rr2(0,.3))); } } }
+  if(G.day>=G.nextPayout){ G.nextPayout=G.day+3; if(G.pending!==0){ const amt=G.pending; G.cash+=amt; G.pending=0; notify(`💰 Amazon payout: ${$0(amt)} hit your bank`); } }
+  queueReprice();
+  if(G.lots.some(L=>L.stage==='selling')) queueEbayDaily();
+  queueTask('bea',{kind:'daily',title:`Day ${d.day} money report`,dur:5,data:d});
+  markSave();
+}
+const lotLeft=L=>L.stage==='selling'?L.sellable-L.sold:['freight','arrived'].includes(L.stage)?L.units:0;
+const stockUnits=()=>G.purchases.filter(p=>!['done','suppressed'].includes(p.stage)).reduce((s,p)=>s+p.stock,0)+(G.lots||[]).reduce((s,L)=>s+lotLeft(L),0);
+const stockValue=()=>G.purchases.filter(p=>!['done','suppressed'].includes(p.stage)).reduce((s,p)=>s+p.stock*p.cost,0)+(G.lots||[]).reduce((s,L)=>s+(L.stage==='selling'?L.allIn*(L.sellable-L.sold)/Math.max(1,L.sellable):['bidding','freight','arrived'].includes(L.stage)?L.allIn:0),0);
+
+// ================= office simulation =================
+let t=0;
+function sendToWork(a, byBoss){
+  if(!isSlacking(a)) return false;
+  if(!a.queue.length){ if(byBoss){ a.bubble=pick(["Nothing to do, boss! 🤷","My inbox is empty!","All caught up 😎"]); a.bubbleT=2.2; } return false; }
+  a.task=a.queue.shift(); a.prog=0; a.spot=null;
+  if(byBoss){ a.bubble=pick(["On it, boss! 🫡","Okay okay, going!","Back to it 💼","Right away!"]); a.bubbleT=2; }
+  walkTo(a, a.seat.cx, a.seat.cy, 'work'); updStats(); return true;
+}
+function goOnBreak(a,fresh){
+  const free=spots.filter(s=>!agents.some(o=>o!==a && o.spot===s)); const s=pick(free); a.spot=s;
+  if(fresh) a.idleT=6+Math.random()*9; a.wanderT=6+Math.random()*8; walkTo(a,s.cx,s.cy,'idle'); updStats();
+}
+function startTask(a){
+  const tk=a.task, h=TASKS[tk.kind]; tk._={who:a.name}; tk._who=a.name;
+  try{ if(h.begin) h.begin(tk); }catch(e){ console.error(e); }
+  if(h.prompt && aiAvailable() && !(h.skipAI && h.skipAI(tk))){ tk._.ai='pending';
+    think(a,tk.title,h.prompt(tk),h.tier).then(r=>{ tk._.out=r.out; tk._.entry=r.entry; }).catch(()=>{}).finally(()=>{ tk._.ai='done'; }); }
+}
+function finishTask(a){
+  const tk=a.task, h=TASKS[tk.kind]; let res=null, src='ai';
+  if(tk._.out){ try{ res=h.parse(tk,tk._.out); }catch(e){ res=null; if(tk._.entry){ tk._.entry.status='fallback'; } } }
+  if(!res){ res=h.fallback(tk); src='rules'; }
+  try{ h.apply(tk,res,src); }catch(e){ console.error(e); }
+  a.done++; renderSheetSoon(); updStats();
+}
+function step(rdt){
+  if(!booted) return;
+  const dt=rdt*speed; t+=dt;
+  simBusiness(dt);
+  for(const a of agents){
+    a.bob+=dt*9; if(a.bubbleT>0){ a.bubbleT-=dt; if(a.bubbleT<=0) a.bubble=null; }
+    if(a.state==='walk'){
+      let sp=2.4*dt;
+      while(sp>0 && a.path.length){ const [tx,ty]=a.path[0], dx=tx-a.x, dy=ty-a.y, d=Math.hypot(dx,dy);
+        if(d<=sp){ a.x=tx; a.y=ty; sp-=d; a.path.shift(); } else { a.x+=dx/d*sp; a.y+=dy/d*sp; sp=0; } }
+      if(!a.path.length){ a.state=a.next; if(a.state==='work') startTask(a); updStats(); }
+    } else if(a.state==='work'){
+      const waitingAI = a.task._ && a.task._.ai==='pending';
+      a.prog=Math.min(waitingAI?.93:1, a.prog+dt/a.task.dur);
+      if(waitingAI && a.prog>=.93 && !a.bubble){ a.bubble='🧠 thinking…'; a.bubbleT=1.4; }
+      if(a.prog>=1){ finishTask(a); a.task=null;
+        if(a.queue.length && Math.random()<.55){ a.task=a.queue.shift(); a.prog=0; a.bubble='Next one! 💪'; a.bubbleT=1.5; startTask(a); }
+        else { a.bubble=pick(["Done! Break time ☕","Nailed it 😎","Ping pong anyone?","Water break 💧"]); a.bubbleT=2.2; goOnBreak(a,true); } }
+    } else if(a.state==='idle'){
+      a.idleT-=dt; a.wanderT-=dt;
+      if(!a.bubble && Math.random()<dt*.18 && agents.some(o=>o!==a && o.state==='idle' && Math.hypot(o.x-a.x,o.y-a.y)<3.2)){ a.bubble=pick(GOSSIP); a.bubbleT=3.4; }
+      if(a.idleT<=0 && a.queue.length && Math.random()<dt*.3){ a.bubble="Fine… I'll go work 🙄"; a.bubbleT=2; sendToWork(a,false); }
+      else if(a.wanderT<=0) goOnBreak(a);
+    }
+  }
+  leaderboard=[...agents].sort((p,q)=>q.done-p.done);
+}
+
+// ================= save / load =================
+let DB=null, UID=null, saveRef=null, saveDirty=false, saving=false, booted=false, saveStatus='Not saved yet';
+function markSave(){ saveDirty=true; }
+function snapshot(){
+  G.hired=agents.map(a=>a.key);
+  G.queues={}; for(const a of agents){ const q=[]; if(a.task) q.push(a.task); q.push(...a.queue); G.queues[a.key]=q; }
+  G.speed=speed;
+  return JSON.stringify(G,(k,v)=>k==='_'||k==='_who'?undefined:v);
+}
+async function saveNow(){
+  if(!saveRef||saving||!saveDirty) return; saving=true; saveDirty=false;
+  try{ await saveRef.set({v:3, json:snapshot(), savedAt:Date.now()}); saveStatus=`Saved · Day ${G.day}`; }
+  catch(e){ saveStatus='Save failed ('+((e&&e.code)||'error')+')'; if(e&&e.code==='quota_exceeded') notify('⚠️ Save is full. Start a new game from the Team tab.'); }
+  saving=false; renderSheetSoon();
+}
+setInterval(()=>{ if(booted && t>0) saveDirty=saveDirty||true; saveNow(); },15000);
+document.addEventListener('visibilitychange',()=>{ if(document.hidden && booted){ saveDirty=true; saveNow(); } });
+window.addEventListener('pagehide',()=>{ if(booted){ saveDirty=true; saveNow(); } });
+function loadState(json){
+  const s=JSON.parse(json); G=Object.assign(freshState(),s); G.aiOn=false;
+  agents=[]; for(const key of G.hired){ const idx=ROLES.findIndex(r=>r.key===key); if(idx>=0) agents.push(makeAgent(idx,(G.queues[key]||[]))); }
+  speed=G.speed||1; speedBtn.textContent=speed+'×';
+  const anyKind=k=>agents.some(a=>a.queue.some(t=>t.kind===k));
+  if(G.hunting && !anyKind('hunt') && !G.pendingReport) G.hunting=false;
+  if(G.pendingReport && !anyKind('history') && !anyKind('ip')) nextCheck();
+  if(G.messages.some(m=>!m.done)) queueSupport();
+}
+async function boot(){
+  const localBoot=()=>{ clearTimeout(timer);
+    try{ const ls=window.localStorage, KEY='ggn-office-save-v1';
+      saveRef={get:async()=>{ const v=ls.getItem(KEY); return {exists:!!v, data:()=>v?JSON.parse(v):undefined}; }, set:async(d)=>{ ls.setItem(KEY,JSON.stringify(d)); }};
+      const v=ls.getItem(KEY);
+      if(v){ try{ loadState(JSON.parse(v).json); saveStatus=`Loaded · Day ${G.day} (saved on this device)`; return finish(`💾 Welcome back! Loaded your company at Day ${G.day}.`); }catch(e){ console.error(e); G=freshState(); agents=[]; } }
+      saveStatus='Saving on this device'; return finish('🏢 Day 1: You have $1,000 (pretend). Scout is reviewing today’s leads…');
+    }catch(e){ saveRef=null; saveStatus='Saving unavailable here'; return finish('🏢 Day 1: You have $1,000 (pretend). Scout is reviewing today’s leads…'); } };
+  const finish=(msg)=>{ if(booted) return; booted=true; if(!agents.length) [0,3,5,7].forEach(i=>agents.push(makeAgent(i)));
+    log(msg); updStats(); renderSheetSoon(); document.getElementById('loading').style.display='none'; };
+  const timer=setTimeout(()=>finish('🏢 Day 1: You have $1,000 (pretend). Scout is reviewing today’s leads… (couldn’t reach saved games)'),10000);
+  try{
+    if(!window.claude) return localBoot();
+    const [db,user]=await Promise.all([claude.use('db'),claude.use('user')]);
+    const uid=user? await user.id():null;
+    if(db&&uid){ DB=db; UID=uid; saveRef=db.doc(`data/users/${uid}/ggnsave`); const snap=await saveRef.get();
+      clearTimeout(timer);
+      if(snap.exists && snap.data().json){ try{ loadState(snap.data().json); saveStatus=`Loaded · Day ${G.day}`; return finish(`💾 Welcome back! Loaded your company at Day ${G.day}.`); }catch(e){ console.error(e); G=freshState(); agents=[]; } }
+      saveStatus='New game (saving on)'; return finish('🏢 Day 1: You have $1,000 (pretend). Scout is reviewing today’s leads…');
+    }
+    throw 0;
+  }catch(e){ clearTimeout(timer); saveStatus='Saving unavailable here'; finish('🏢 Day 1: You have $1,000 (pretend). Scout is reviewing today’s leads…'); }
+}
+async function newGame(){
+  G=freshState(); agents=[]; [0,3,5,7].forEach(i=>agents.push(makeAgent(i))); aiLog.length=0; speed=1; speedBtn.textContent='1×';
+  log('🆕 New game! Day 1 with $1,000 (pretend).'); saveDirty=true; await saveNow(); renderSheet(); updStats();
+}
+// ================= drawing: walls & floor =================
+const sky = []; for(let k=0;k<200;k++) sky.push(rnd());
+function windowRun(wall,a,b){
+  const R = wall==='y' ? (s,e,z0,z1,c)=>rectY(s,e,0,z0,z1,c) : (s,e,z0,z1,c)=>rectX(0,s,e,z0,z1,c);
+  R(a,b,8,WALL-6,'#cfeaf6');
+  let k=Math.floor(a*7)%150;
+  for(let s=a;s<b-0.05;s+=.3){ const h=14+sky[k++]*44; R(s,Math.min(b,s+.26),8,8+h,sky[k++]>.5?'#a9cadb':'#b8d6e4');
+    for(let z=14;z<8+h-4;z+=7) R(s+.06,Math.min(b,s+.1),z,z+2,'rgba(255,255,255,.55)'); }
+  for(let s=a;s<=b+.01;s+=.85) R(s,s+.05,8,WALL-6,'#3b4049');
+  R(a,b,WALL-8,WALL-6,'#3b4049'); R(a,b,8,10,'#3b4049');
+}
+function board(wall,a,b,dark,title,lines){
+  const R = wall==='y' ? (s,e,z0,z1,c)=>rectY(s,e,0.01,z0,z1,c) : (s,e,z0,z1,c)=>rectX(0.01,s,e,z0,z1,c);
+  R(a,b,24,62,'#8a6a45'); R(a+.05,b-.05,26,60,dark?'#2d3436':'#fafaf7');
+  const T = wall==='y' ? (x,z,txt,f,c)=>textY(x,0.02,z,txt,f,c) : (y,z,txt,f,c)=>textX(0.02,y,z,txt,f,c);
+  const start = wall==='y'? a+.15 : b-.15;
+  T(start,54,title,'800 7px system-ui',dark?'#f0c23a':'#2a2620');
+  lines.forEach((l,k)=>T(start,46-k*6,l,'500 5px system-ui',dark?'#e5e5e5':'#555'));
+}
+function drawWalls(){
+  // outer back walls
+  rectY(0,W,0,0,WALL,'#f3f0e8'); rectX(0,0,H,0,WALL,'#e9e5db');
+  poly([iso(-.3,-.3,WALL),iso(W,-.3,WALL),iso(W,0,WALL),iso(0,0,WALL)],'#2a2d33');
+  poly([iso(-.3,-.3,WALL),iso(0,0,WALL),iso(0,H,WALL),iso(-.3,H,WALL)],'#2a2d33');
+  rectY(W,W+0,0,0,WALL,'#000'); rectX(-.3,H,H,0,WALL,'#000');
+  poly([iso(W,-.3,0),iso(W,0,0),iso(W,0,WALL),iso(W,-.3,WALL)],'#c9c3b6');
+  poly([iso(-.3,H,0),iso(0,H,0),iso(0,H,WALL),iso(-.3,H,WALL)],'#d6d0c3');
+  // y-wall features
+  board('y',.35,2.85,false,'GOALS & IDEAS',['• Grow $1k → $10k','• Keep ROI above 25%','• Never run out of cash','• Hire the full team']);
+  windowRun('y',3.0,6.45);
+  board('y',6.55,7.95,true,'AGENDA',['Mon  Sourcing','Wed  Restock','Fri  Payday 💸']);
+  windowRun('y',12.2,15.4);
+  // sales chart board
+  rectY(15.6,18.7,0.01,24,62,'#8a6a45'); rectY(15.65,18.65,0.01,26,60,'#fafaf7');
+  textY(15.75,0.02,53,'SALES THIS WEEK','800 6.5px system-ui','#2a2620');
+  [10,16,13,21,18,26,30].forEach((h,k)=>rectY(15.85+k*.38,16.1+k*.38,0.02,30,30+h,k===6?'#36b37e':'#7aa7f5'));
+  windowRun('y',18.9,23.75);
+  // x-wall features
+  windowRun('x',.35,6.65);
+  for(const [a,b] of [[7.7,8.8],[9.0,10.1]]){ rectX(0.01,a,b,0,50,'#b9bfc8'); rectX(0.02,a+.04,b-.04,0,47,'#d5dae1'); rectX(0.03,(a+b)/2-.01,(a+b)/2+.01,0,47,'#9aa1ab');
+    rectX(0.02,(a+b)/2-.06,(a+b)/2+.06,53,58,'#2fbf5f'); }
+  rectX(0.01,10.3,11.9,6,66,'#e8833a'); textX(0.02,11.75,42,'GGN','900 20px system-ui','#fff'); textX(0.02,11.75,30,'GLOBAL GENERAL NEEDS','800 4.6px system-ui','#fff');
+  windowRun('x',12.3,17.7);
+  board('x',18.4,21.5,false,'MARKETPLACE TEAM',['eBay · Walmart · Liquidation','Lots → warehouse → eBay','Amazon items → Walmart too','Royce approves every bid']);
+  windowRun('x',21.8,24.7);
+}
+function drawFloor(){
+  // slab
+  poly([iso(0,H,0),iso(W,H,0),iso(W,H,-16),iso(0,H,-16)],'#3a3f48');
+  poly([iso(W,0,0),iso(W,H,0),iso(W,H,-16),iso(W,0,-16)],'#2e333b');
+  poly([iso(0,0),iso(W,0),iso(W,H),iso(0,H)],'#ecebe6');
+  // director's office wood
+  poly([iso(0,0),iso(8,0),iso(8,7),iso(0,7)],'#b9733f');
+  ctx.strokeStyle='rgba(80,40,10,.18)'; ctx.lineWidth=1;
+  for(let y=.5;y<7;y+=.5){ ctx.beginPath(); ctx.moveTo(...iso(0,y)); ctx.lineTo(...iso(8,y)); ctx.stroke(); }
+  poly([iso(1.4,2.4),iso(7.6,2.4),iso(7.6,6.4),iso(1.4,6.4)],'#e8dcc6');
+  // work room
+  poly([iso(12,0),iso(W,0),iso(W,10),iso(12,10)],'#f4b27c');
+  ctx.strokeStyle='rgba(150,80,30,.10)';
+  for(let x=13;x<W;x++){ ctx.beginPath(); ctx.moveTo(...iso(x,0)); ctx.lineTo(...iso(x,10)); ctx.stroke(); }
+  // meeting room
+  poly([iso(12,10),iso(W,10),iso(W,18),iso(12,18)],'#e3c9a4');
+  poly([iso(14.2,11.5),iso(21.8,11.5),iso(21.8,16.5),iso(14.2,16.5)],'#cfd8e3');
+  // common area accents
+  poly([iso(.8,11.6),iso(9,11.6),iso(9,17.5),iso(.8,17.5)],'#dfe3ea');
+  poly([iso(1,8.2),iso(3.4,8.2),iso(3.4,11.2),iso(1,11.2)],'#e6e1d6');
+  ctx.strokeStyle='rgba(0,0,0,.035)';
+  for(let x=0;x<=12;x++){ ctx.beginPath(); ctx.moveTo(...iso(x,7)); ctx.lineTo(...iso(x,18)); ctx.stroke(); }
+  // marketplace wing + warehouse
+  poly([iso(0,18),iso(12,18),iso(12,H),iso(0,H)],'#d3e6e0');
+  poly([iso(1,22.6),iso(11.5,22.6),iso(11.5,24.6),iso(1,24.6)],'#c4dbd3');
+  poly([iso(12,18),iso(W,18),iso(W,H),iso(12,H)],'#c9ced4');
+  for(const y of [21.55,22.35]) poly([iso(13,y),iso(22.6,y),iso(22.6,y+.08),iso(13,y+.08)],'#e8c33a');
+  ctx.strokeStyle='rgba(0,0,0,.035)';
+  for(let y=7;y<=18;y++){ ctx.beginPath(); ctx.moveTo(...iso(0,y)); ctx.lineTo(...iso(12,y)); ctx.stroke(); }
+}
+
+// ================= drawing: people =================
+function drawPerson(a){
+  const walking=a.state==='walk', working=a.state==='work'||a.boss, sitting=working || (a.state==='idle'&&a.spot&&a.spot.sit);
+  const [px,py]=iso(a.x,a.y);
+  ctx.fillStyle='rgba(0,0,0,.16)'; ctx.beginPath(); ctx.ellipse(px,py,10,5,0,0,7); ctx.fill();
+  if(a===selected){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(px,py,14,7,0,0,7); ctx.stroke(); }
+  else if(a.state==='idle'){ const r=11+Math.sin(t*5)*1.5; ctx.strokeStyle='rgba(232,131,58,.75)'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.ellipse(px,py,r,r/2,0,0,7); ctx.stroke(); }
+  const bob = walking ? Math.abs(Math.sin(a.bob))*2.5 : 0;
+  const base = py - bob - (sitting?7:0);
+  // legs
+  ctx.fillStyle='#2d3240';
+  if(sitting){ ctx.fillRect(px-6,base-6,5,6); ctx.fillRect(px+1,base-6,5,6); }
+  else { const sw=walking?Math.sin(a.bob)*2.5:0; ctx.fillRect(px-5+sw,base-10,4,10); ctx.fillRect(px+1-sw,base-10,4,10);
+    ctx.fillStyle='#1b1d22'; ctx.fillRect(px-6+sw,base-2,5,2.5); ctx.fillRect(px+1-sw,base-2,5,2.5); }
+  // long hair behind
+  if(a.style==='long'){ ctx.fillStyle=a.hair; rr(px-9.5,base-38,19,22,6); ctx.fill(); }
+  // body
+  ctx.fillStyle=a.shirt; rr(px-8.5,base-25,17,16,5); ctx.fill();
+  if(a.boss){ ctx.fillStyle='#fff'; ctx.beginPath(); ctx.moveTo(px-3,base-25); ctx.lineTo(px+3,base-25); ctx.lineTo(px,base-20); ctx.fill();
+    ctx.fillStyle='#d9473f'; ctx.fillRect(px-1,base-22,2,8); }
+  else { ctx.strokeStyle='rgba(255,255,255,.75)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(px-3.5,base-25); ctx.lineTo(px,base-18); ctx.lineTo(px+3.5,base-25); ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.fillRect(px-2.5,base-18,5,4); }
+  // arms
+  ctx.fillStyle=a.skin;
+  if(working){ const k=Math.sin(t*22+(a.i||0))*1.3; ctx.fillRect(px-10,base-14+k,4,3.5); ctx.fillRect(px+6,base-14-k,4,3.5); }
+  // head
+  ctx.fillStyle=a.skin; ctx.beginPath(); ctx.arc(px,base-33,9,0,7); ctx.fill();
+  ctx.fillStyle=a.hair;
+  if(a.style==='bun'){ ctx.beginPath(); ctx.arc(px,base-44,4.5,0,7); ctx.fill(); }
+  if(a.style==='curly'){ for(const [dx,dy] of [[-6,-38],[0,-41],[6,-38],[-8,-33],[8,-33]]){ ctx.beginPath(); ctx.arc(px+dx,base+dy,4.2,0,7); ctx.fill(); } }
+  else if(a.style==='spiky'){ ctx.beginPath(); ctx.moveTo(px-9,base-34); for(let s=0;s<5;s++){ ctx.lineTo(px-9+s*4.5+2.2,base-46); ctx.lineTo(px-9+(s+1)*4.5,base-38); } ctx.lineTo(px+9,base-34); ctx.fill(); }
+  else { ctx.beginPath(); ctx.arc(px,base-34.5,9.2,Math.PI*1.02,Math.PI*1.98); ctx.fill(); ctx.fillRect(px-9,base-36,3,5); }
+  // face
+  ctx.fillStyle='#222'; ctx.fillRect(px-4,base-32,2,2.6); ctx.fillRect(px+2,base-32,2,2.6);
+  ctx.fillStyle='rgba(230,110,110,.35)'; ctx.fillRect(px-7,base-29,3,2); ctx.fillRect(px+4,base-29,3,2);
+  // headset (working)
+  if(working && !a.boss){ ctx.strokeStyle='#2f6fd1'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(px,base-34,10,Math.PI*1.08,Math.PI*1.92); ctx.stroke();
+    ctx.fillStyle='#2f6fd1'; rr(px+7.5,base-36,4,6,2); ctx.fill(); rr(px-11.5,base-36,4,6,2); ctx.fill();
+    ctx.strokeStyle='#2f6fd1'; ctx.lineWidth=1.3; ctx.beginPath(); ctx.moveTo(px+9,base-30); ctx.quadraticCurveTo(px+8,base-26,px+3,base-26); ctx.stroke(); }
+  // props on break
+  if(a.state==='idle' && a.spot){ const k=a.spot.k;
+    if(k==='cooler'){ ctx.fillStyle='#fff'; ctx.fillRect(px+8,base-19,5,6); ctx.fillStyle='#7cc6ff'; ctx.fillRect(px+8.5,base-18,4,2); }
+    if(k==='pool'){ ctx.strokeStyle='#c9a06a'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(px-14,base-6); ctx.lineTo(px+12,base-24); ctx.stroke(); }
+    if(k==='pong'){ const sw=Math.sin(t*6+a.i)*3; ctx.fillStyle='#d9473f'; ctx.beginPath(); ctx.arc(px+11,base-17+sw,4,0,7); ctx.fill(); }
+    if(k==='arcade'||k==='foos'){ const s=Math.sin(t*14)*1.2; ctx.fillStyle=a.skin; ctx.fillRect(px-11,base-17+s,4,3.5); ctx.fillRect(px+7,base-17-s,4,3.5); }
+  }
+  a.hx=px; a.hy=base-48;
+}
+
+// ================= render =================
+function render(){
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,viewW,viewH);
+  ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*offX,dpr*offY);
+  drawFloor(); drawWalls();
+  const people=[...agents, boss];
+  const list = statics.slice();
+  for(const a of people) list.push({d:a.x+a.y+.05, f:()=>drawPerson(a)});
+  list.sort((p,q)=>p.d-q.d); for(const o of list) o.f();
+  drawOverlays(people.sort((p,q)=>(p.x+p.y)-(q.x+q.y)));
+  updateCard();
+
+}
+
+// ================= view / input =================
+const WB={minX:-H*32-20, maxX:W*32+20, minY:-WALL-30, maxY:(W+H)*16+30};
+function clamp(){
+  const m=.35;
+  offX=Math.min(-WB.minX*scale+viewW*m, Math.max(viewW*(1-m)-WB.maxX*scale, offX));
+  offY=Math.min(-WB.minY*scale+viewH*m, Math.max(viewH*(1-m)-WB.maxY*scale, offY));
+}
+function resize(){
+  const r=stage.getBoundingClientRect(); dpr=window.devicePixelRatio||1; viewW=r.width; viewH=r.height;
+  cv.width=viewW*dpr; cv.height=viewH*dpr;
+  if(!inited){ inited=true;
+    const fitH=viewH/(WB.maxY-WB.minY), fitW=viewW/(WB.maxX-WB.minX);
+    scale = viewW<700 ? Math.max(fitH*.78,.48) : Math.min(fitH,fitW)*1.02;
+    const [fx,fy]=viewW<700?iso(14,7):iso(12,9); offX=viewW/2-fx*scale; offY=viewH/2-(fy-(viewW<700?60:20))*scale; }
+  clamp();
+}
+function zoomAt(f,cx,cy){ const ns=Math.max(.35,Math.min(2.4,scale*f)); offX=cx-(cx-offX)*ns/scale; offY=cy-(cy-offY)*ns/scale; scale=ns; clamp(); }
+window.addEventListener('resize',resize);
+zin.onclick=()=>zoomAt(1.25,viewW/2,viewH/2); zout.onclick=()=>zoomAt(.8,viewW/2,viewH/2);
+cv.addEventListener('wheel',e=>{ e.preventDefault(); const r=cv.getBoundingClientRect(); zoomAt(e.deltaY<0?1.1:.9,e.clientX-r.left,e.clientY-r.top); },{passive:false});
+const ptrs=new Map(); let gesture=null;
+cv.addEventListener('pointerdown',e=>{ cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===1) gesture={type:'pan',sx:e.clientX,sy:e.clientY,ox:offX,oy:offY,moved:false};
+  else if(ptrs.size===2){ const [p,q]=[...ptrs.values()]; gesture={type:'pinch',d:Math.hypot(p.x-q.x,p.y-q.y),s:scale}; } });
+cv.addEventListener('pointermove',e=>{ if(!ptrs.has(e.pointerId)||!gesture) return; ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(gesture.type==='pan'){ const dx=e.clientX-gesture.sx, dy=e.clientY-gesture.sy; if(Math.hypot(dx,dy)>8) gesture.moved=true;
+    if(gesture.moved){ offX=gesture.ox+dx; offY=gesture.oy+dy; clamp(); } }
+  else if(ptrs.size===2){ const [p,q]=[...ptrs.values()], r=cv.getBoundingClientRect(); const d=Math.hypot(p.x-q.x,p.y-q.y);
+    zoomAt((gesture.s*d/gesture.d)/scale,(p.x+q.x)/2-r.left,(p.y+q.y)/2-r.top); } });
+function endPtr(e){ const g=gesture; ptrs.delete(e.pointerId);
+  if(g && g.type==='pan' && !g.moved && ptrs.size===0) tap(e);
+  if(ptrs.size===0) gesture=null; else if(ptrs.size===1){ const p=[...ptrs.values()][0]; gesture={type:'pan',sx:p.x,sy:p.y,ox:offX,oy:offY,moved:true}; } }
+cv.addEventListener('pointerup',endPtr); cv.addEventListener('pointercancel',e=>{ptrs.delete(e.pointerId); if(!ptrs.size) gesture=null;});
+// ================= overlays (screen space) =================
+let selected=null, selT=0, selAt=[0,0];
+function pill(x,y,txt,dot,bar){
+  ctx.font='700 11px system-ui,sans-serif'; const w=ctx.measureText(txt).width+(dot?22:14)+(bar?4:0), h=18;
+  ctx.fillStyle='rgba(0,0,0,.12)'; rr(x-w/2,y-h+2,w,h,9); ctx.fill();
+  ctx.fillStyle='#fff'; rr(x-w/2,y-h,w,h,9); ctx.fill();
+  let tx=x-w/2+8;
+  if(bar){ ctx.fillStyle=bar; rr(x-w/2+5,y-h+4,3,h-8,1.5); ctx.fill(); tx+=4; }
+  if(dot){ ctx.fillStyle=dot; ctx.beginPath(); ctx.arc(tx+3,y-h/2,3.5,0,7); ctx.fill(); tx+=10; }
+  ctx.fillStyle='#2a2620'; ctx.textAlign='left'; ctx.fillText(txt,tx,y-5.5);
+  return w;
+}
+function badge(x,y,n){ ctx.font='800 10px system-ui'; const w=Math.max(16,ctx.measureText(n).width+9);
+  ctx.fillStyle='#e5484d'; rr(x-w/2,y-8,w,16,8); ctx.fill(); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.fillText(n,x,y+3.5); }
+function drawOverlays(people){
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const big=scale>=1, bubbles=[];
+  for(const a of people){
+    const sx=offX+a.hx*scale, sy=offY+a.hy*scale;
+    if(sx<-60||sx>viewW+60||sy<-40||sy>viewH+60) continue;
+    const st=a.boss?['CEO','#8a5cf0']: a.state==='work'?['working','#36b37e']: isSlacking(a)?['on break','#e8833a']:['heading to desk','#3d6cf0'];
+    let topY=sy, w;
+    if(big){ w=pill(sx,sy,a.name,null,a.shirt); pill(sx,sy-21,st[0],st[1]); topY=sy-21; }
+    else w=pill(sx,sy,a.name,st[1]);
+    if(!a.boss && isSlacking(a) && a.queue.length) badge(sx+w/2,sy-16,a.queue.length);
+    if(a.state==='work' && a.task){ ctx.fillStyle='rgba(0,0,0,.25)'; rr(sx-18,sy+3,36,4,2); ctx.fill();
+      ctx.fillStyle='#36b37e'; rr(sx-18,sy+3,36*Math.min(1,a.prog),4,2); ctx.fill(); }
+    if(a.bubble) bubbles.push([sx,topY-22,a.bubble]);
+  }
+  for(const [x,y,txt] of bubbles){
+    ctx.font='600 11px system-ui,sans-serif'; let s=txt; while(ctx.measureText(s).width>170) s=s.slice(0,-2);
+    if(s!==txt) s+='…'; const w=ctx.measureText(s).width+16, h=22;
+    ctx.fillStyle='rgba(0,0,0,.14)'; rr(x-w/2,y-h+2,w,h,10); ctx.fill();
+    ctx.fillStyle='#fffdf5'; rr(x-w/2,y-h,w,h,10); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x-5,y-1); ctx.lineTo(x+5,y-1); ctx.lineTo(x,y+5); ctx.fill();
+    ctx.fillStyle='#2a2620'; ctx.textAlign='center'; ctx.fillText(s,x,y-7);
+  }
+}
+function updateCard(){
+  if(!selected || t>selT){ cardEl.style.display='none'; cardEl._who=null; if(selected&&t>selT) selected=null; return; }
+  const a=selected, sx=offX+selAt[0]*scale, sy=offY+selAt[1]*scale-(scale>=1?48:26);
+  let html;
+  if(a.boss) html=`<div class="st">Director's Office</div><div class="nm">Royce · CEO</div><div class="ln">Approves every purchase 👀</div>`;
+  else if(a.state==='work' && a.task) html=`<div class="st">Station ${a.station}</div><div class="nm">${a.name} · ${a.role}</div><div class="ln">${a.task._&&a.task._.ai==='pending'?'🧠 ':''}${esc(a.task.title)}</div><div class="bar"><i style="width:${Math.round(a.prog*100)}%"></i></div>${a.queue.length?`<div class="nm" style="margin-top:4px">${a.queue.length} more waiting</div>`:''}`;
+  else if(isSlacking(a)) html=`<div class="st">${a.name} · on break</div><div class="nm">${a.role}</div><div class="ln">${a.queue.length?a.queue.length+' task'+(a.queue.length>1?'s':'')+' waiting!':'No tasks right now'}</div>`;
+  else html=`<div class="st">Station ${a.station}</div><div class="nm">${a.name} · ${a.role}</div><div class="ln">Heading to desk → ${a.task?esc(a.task.title):''}</div>`;
+  if(cardInfo._h!==html){ cardInfo.innerHTML=html; cardInfo._h=html; }
+  if(cardEl._who!==a){ cardEl._who=a; cardBtns.innerHTML = a.boss?'' : `<button data-c="report">📋 ${a.key==='scout'?'Ask for product report':'Ask for report'}</button>`; }
+  cardEl.style.display='block'; cardEl.style.left=Math.max(110,Math.min(viewW-110,sx))+'px'; cardEl.style.top=Math.max(118,sy)+'px';
+}
+cardBtns.addEventListener('click',e=>{ const b=e.target.closest('[data-c]'); if(!b||!selected) return;
+  if(b.dataset.c==='report'){ askReport(selected); selT=t+2.5*speed; } });
+function openReportSoon(id){ if(sheetOpen && !(tab==='reports'&&!openRep)) { renderSheetSoon(); return; } openRep=id; openSheet('reports'); body.scrollTop=0; }
+function tap(e){
+  const r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+  let best=null, bd=1e9;
+  for(const a of [...agents,boss]){ const sx=offX+a.hx*scale, sy=offY+(a.hy+26)*scale; const d=Math.hypot(sx-mx,(sy-my)*.8); if(d<bd){bd=d;best=a;} }
+  if(!best || bd>Math.max(26,30*scale)){ selected=null; return; }
+  if(!best.boss && isSlacking(best)){ if(sendToWork(best,true)) log(`📣 You sent ${best.name} back to work`); }
+  selected=best; selT=t+6*speed; selAt=[best.hx,best.hy];
+}
+
+// ================= HUD / log / toast =================
+const logs=[], logEl=document.getElementById('log'), toastEl=document.getElementById('toast'); let toastTimer;
+function log(m){ logs.unshift(m); logs.length=Math.min(logs.length,2); logEl.innerHTML=logs.map(l=>`<div>${l}</div>`).join(''); }
+function notify(m){ log(m); toastEl.innerHTML=m; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>toastEl.classList.remove('show'),2600); renderSheetSoon(); updStats(); }
+function updStats(){
+  sCash.textContent=$0(G.cash); sCash.style.color=G.cash<0?'#d33':'';
+  sPay.textContent=$0(G.pending); sStock.textContent=stockUnits(); sSold.textContent=G.total.units;
+  const unread=G.reports.filter(r=>!r.read).length; repBadge.textContent=unread; repBadge.style.display=unread?'':'none';
+  aiChip.textContent = !aiReady?'🧠 …' : !AI?'🧠 AI unavailable' : G.aiOn?(Date.now()<aiPauseUntil?'🧠 AI paused':'🧠 AI ON'):'🧠 AI OFF';
+  aiChip.className = G.aiOn&&AI?'on':'';
+}
+function updClock(){
+  const mins=Math.floor(G.time*24*60), h=Math.floor(mins/60), m=mins%60, h12=((h+11)%12)+1;
+  clk.textContent=`${h12}:${String(m).padStart(2,'0')} ${h<12?'AM':'PM'}`;
+  clkLbl.textContent=`DAY ${G.day} · PAYOUT IN ${G.nextPayout-G.day}D`;
+}
+speedBtn.onclick=()=>{ const max=8; speed = speed>=max?1:speed*2; speedBtn.textContent=speed+'×'; markSave(); };
+aiChip.onclick=()=>openSheet('team');
+
+// ================= sheet (Reports / Products / Team) =================
+let tab='reports', sheetOpen=false, openRep=null, dirty=false;
+const sheet=document.getElementById('sheet'), body=document.getElementById('sheetBody');
+function openSheet(which){ tab=which; sheetOpen=true; sheet.classList.add('open'); document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab)); renderSheet(); }
+function closeSheet(){ sheetOpen=false; sheet.classList.remove('open'); }
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>openSheet(b.dataset.t));
+sheetClose.onclick=closeSheet;
+navRep.onclick=()=>openSheet('reports'); navProd.onclick=()=>openSheet('products'); navTeam.onclick=()=>openSheet('team'); navAI.onclick=()=>openSheet('ai');
+function renderSheetSoon(){ dirty=true; }
+setInterval(()=>{ const openDetails=body.querySelector('details[open]');
+  if(sheetOpen && !openDetails && (dirty || tab==='products' || (tab==='ai' && aiLog.some(e=>e.status==='thinking'||e.status==='waiting')))){ dirty=false; const y=body.scrollTop; renderSheet(); body.scrollTop=y; }
+  else if(dirty && !sheetOpen) dirty=false; updStats(); },800);
+
+const ck=(v,unknown)=> unknown? '<span class="q">?</span>' : v? '<span class="y">✓</span>':'<span class="n">✗</span>';
+const srcTag=s=>s==='ai'?'<span class="srct ai">🧠 AI</span>':'<span class="srct rl">📏 rules</span>';
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function leadCard(rep,l){
+  const r=l.rules, sc=l.scout||{verdict:'recommend',note:''};
+  const warn = l.ipFail ? ['bad','⛔ Fails IP rule'] : (l.rex&&!l.rex.stable) ? ['warn','⚠️ Price unstable'] : passesAll(l) ? ['ok','✅ Meets requirements'] : ['bad','Fails requirements'];
+  const dec = l.decision ? (l.decision.skip ? `<div class="dec skip">Skipped</div>` : `<div class="dec buy">✅ Approved ${l.decision.qty} units · ${$0(l.decision.qty*l.cost)}</div>`) : '';
+  const afford=maxAfford(l);
+  const rex = l.rex ? `<div class="say"><b>Rex:</b> ${l.rex.stable?'✅ Stable.':'⚠️ Unstable.'} ${esc(l.rex.note)} ${srcTag(l.rex.src)}</div>` : '';
+  const ivy = l.ivy ? `<div class="say"><b>Ivy:</b> ${l.ivy.risk==='low'?'✅':l.ivy.risk==='medium'?'🟡':'⛔'} ${l.ivy.risk} IP risk. ${esc(l.ivy.note)} ${srcTag(l.ivy.src)}</div>` : '';
+  return `<div class="lead ${l.decision?'decided':''}">
+    <div class="lh"><b>${l.name}</b><span class="tag ${warn[0]}">${warn[1]}</span></div>
+    <div class="src">Buy at ${l.store} for <b>${$$(l.cost)}</b> → sell on Amazon for <b>${$$(l.ourPrice)}</b> <span class="mut">(Buy Box ${$$(l.buyBox)})</span></div>
+    <div class="grid">
+      <div><span>Profit/unit</span><b class="${l.profit>0?'g':'r'}">${$$(l.profit)}</b></div>
+      <div><span>ROI</span><b class="${l.roi>=.25?'g':'r'}">${Math.round(l.roi*100)}%</b></div>
+      <div><span>Sales rank</span><b>#${l.bsr.toLocaleString()}</b></div>
+      <div><span>Sales (last 3 mo)</span><b class="hist">${(l.salesHist||[l.monthly]).join(' → ')}</b></div>
+      <div><span>FBA sellers</span><b>${l.sellers}</b></div>
+      <div><span>Your share</span><b>~${l.share}/mo</b></div>
+    </div>
+    <div class="checks">
+      <div>${ck(r.bsr)} BSR ≤ 100k</div><div>${ck(r.amazon)} Amazon not selling</div>
+      <div>${ck(r.sellers)} 2+ FBA sellers</div><div>${ck(r.price)} ≤ 3% over Buy Box</div>
+      <div>${ck(r.profit)} ROI ≥ 25%</div><div>${ck(r.trend)} Sales steady</div>
+      <div>${ck(l.rex?l.rex.stable:0,!l.rex)} Stable price ${l.rex?'':'<i>(hire Rex)</i>'}</div>
+      <div>${ck(l.ivy?l.ivy.risk==='low':0,!l.ivy)} Low IP risk ${l.ivy?'':'<i>(hire Ivy)</i>'}</div>
+    </div>
+    <div class="say"><b>Scout:</b> ${esc(sc.note)} ${srcTag(sc.src)}</div>${rex}${ivy}
+    ${dec || `<div class="buyrow">
+      <div class="step"><button data-a="minus" data-l="${l.id}">−</button><b>${l.qty}</b><button data-a="plus" data-l="${l.id}">+</button></div>
+      <div class="cost">${$0(l.qty*l.cost)}<span>max ${afford}</span></div>
+      <button class="skipb" data-a="skip" data-l="${l.id}">Skip</button>
+      <button class="buyb" data-a="buy" data-l="${l.id}" ${l.qty<1||l.qty*l.cost>G.cash?'disabled':''}>Approve</button></div>`}
+  </div>`;
+}
+function lotCard(rep,l){
+  const r=l.rules;
+  const dec=l.decision?(l.decision.skip?`<div class="dec skip">Skipped</div>`:`<div class="dec buy">🔨 Bid approved · ${$0(l.allIn)} held</div>`):'';
+  return `<div class="lead lot ${l.decision?'decided':''}">
+    <div class="lh"><b>${esc(l.category)} · ${l.units} units</b><span class="tag ok">✅ Meets lot rules</span></div>
+    <div class="src">${esc(l.source)} · ${esc(l.condition)} · ${esc(l.manifest)}</div>
+    <div class="grid">
+      <div><span>Retail value</span><b>${$0(l.retail)}</b></div>
+      <div><span>Current bid</span><b>${$0(l.bid)}</b></div>
+      <div><span>Freight</span><b>${$0(l.freight)}</b></div>
+      <div><span>All-in cost</span><b>${$0(l.allIn)}</b></div>
+      <div><span>% of retail</span><b>${Math.round(l.pctRetail*100)}%</b></div>
+      <div><span>Est. eBay resale</span><b>${$0(l.estResale)}</b></div>
+      <div><span>Est. profit</span><b class="${l.profit>0?'g':'r'}">${$0(l.profit)}</b></div>
+      <div><span>Est. ROI</span><b class="g">${Math.round(l.roi*100)}%</b></div>
+      <div><span>Per unit cost</span><b>${$$(l.allIn/l.units)}</b></div>
+    </div>
+    <div class="checks"><div>${ck(r.pct)} ≤ 25% of retail</div><div>${ck(r.roi)} ROI ≥ 50%</div><div>${ck(r.cond)} Not salvage</div><div>${ck(r.manifest)} Full manifest</div></div>
+    <div class="say"><b>Sal:</b> ${esc(l.note||'')} ${srcTag('rules')}</div>
+    ${dec||`<div class="buyrow"><div class="cost">${$0(l.allIn)}<span>held until the auction ends</span></div>
+      <button class="skipb" data-a="lotskip" data-l="${l.id}">Skip</button>
+      <button class="buyb" data-a="lotbuy" data-l="${l.id}" ${l.allIn>G.cash?'disabled':''}>Approve bid</button></div>`}
+  </div>`;
+}
+function lotRow(L){
+  const label={bidding:'Bid placed: waiting on the auction',lost:'Outbid (money returned)',freight:'Won! Freight heading to warehouse',arrived:'At warehouse: waiting for eBay listing',selling:'Selling on eBay',done:'Sold through'};
+  const pct={bidding:.15,lost:1,freight:.35,arrived:.55,selling:.8,done:1};
+  const extra=L.stage==='freight'?` · ~${Math.max(0,L.t).toFixed(1)} days`:L.stage==='selling'&&now()-L.lastTended>1.5?' <span class="r">Eli needs to tend listings!</span>':'';
+  return `<div class="prod"><div class="lh"><b>${esc(L.name)}</b><span class="mut">${esc(L.lot.source)}</span></div>
+    <div class="stage ${L.stage==='selling'?'live':L.stage==='lost'?'suppressed':L.stage==='done'?'done':'order'}">${label[L.stage]}${extra}</div>
+    <div class="pbar"><i style="width:${pct[L.stage]*100}%" class="${L.stage==='selling'?'live':L.stage==='done'?'done':''}"></i></div>
+    ${L.stage==='lost'?'':`<div class="pr"><span>Sold <b>${L.sold}</b>${L.sellable?` of ${L.sellable} sellable`:''}</span><span>${L.net>=L.allIn?`Profit <b class="g">${$0(L.net-L.allIn)}</b>`:`Earned back <b>${$0(L.net)}</b> of ${$0(L.allIn)}`}</span></div>`}</div>`;
+}
+function reportView(rep){
+  rep.read=true; updStats();
+  if(rep.type==='lots') return `<button class="back" data-a="back">‹ All reports</button>
+    <h3>🏗️ Liquidation report from Sal</h3>
+    <p class="mut">Day ${rep.day} · Checked <b>${rep.checked}</b> lots, <b>${rep.lots.length}</b> met every lot rule. Sal never bids without your OK.</p>
+    <details class="reqs"><summary>Your lot rules (checked by code)</summary><ul>
+      <li>All-in cost (bid + 12% buyer premium + freight) ≤ 25% of retail value</li><li>Estimated ROI ≥ 50% after eBay fees (13.25%) and $4/item shipping & packing</li>
+      <li>No salvage / untested lots</li><li>Full manifest only</li></ul>
+      ${rep.fails?`<p class="mut">Rejected: ${Object.entries(rep.fails).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${esc(k)} (${v})`).join(' · ')}</p>`:''}</details>
+    ${!hiredA('ebay')?'<div class="say">⚠️ Hire <b>Eli (eBay Seller)</b> in the Team tab, or won lots will sit in the warehouse.</div>':''}
+    ${rep.lots.length?rep.lots.map(l=>lotCard(rep,l)).join(''):'<p class="mut center">Nothing met your lot rules this time.</p>'}`;
+  if(rep.type==='brief') return `<button class="back" data-a="back">‹ All reports</button>
+    <h3>📋 ${esc(rep.title||'Report')}</h3><p class="mut">Day ${rep.day} · from ${rep.from}, ${rep.role} ${srcTag(rep.src)}</p>
+    <div class="say big">${esc(rep.summary)}</div>${rep.bullets&&rep.bullets.length?`<ul class="tips">${rep.bullets.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}`;
+  if(rep.type==='products') return `<button class="back" data-a="back">‹ All reports</button>
+    <h3>📋 Product report from Scout</h3>
+    <p class="mut">Day ${rep.day}${rep.checked?` · Checked <b>${rep.checked}</b> products, <b>${rep.leads.length}</b> met every requirement`:''}${rep.leads.some(l=>l.rex)?' · Rex checked price history':''}${rep.leads.some(l=>l.ivy)?' · Ivy checked IP risk':''}. Nothing is bought until you approve.</p>
+    <details class="reqs"><summary>Your requirements (checked by code, not guesses)</summary><ul>
+      <li>BSR 100,000 or better</li><li>Amazon not selling on the listing</li><li>At least 2 FBA sellers</li><li>Your price ≤ 3% over the Buy Box</li><li>ROI 25% or more</li>
+      <li>Sales history steady (last month ≥ 70% of 3-month average)</li><li>No IP problems (Ivy)</li><li>Quantity ≈ 1 month of your share (last month's sales ÷ (FBA sellers + 1)), max 35% of cash</li></ul>
+      ${rep.fails?`<p class="mut">Rejected today: ${Object.entries(rep.fails).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${esc(k)} (${v})`).join(' · ')}</p>`:''}</details>
+    ${rep.summary?`<div class="say big"><b>Scout:</b> ${esc(rep.summary)} ${srcTag(rep.src)}</div>`:''}
+    ${rep.leads.map(l=>leadCard(rep,l)).join('')}`;
+  const d=rep.d, tt=d.sinceStart, worth=d.cash+d.pendingPayout+d.inventoryCost;
+  return `<button class="back" data-a="back">‹ All reports</button>
+    <h3>📊 ${esc(rep.headline||('Day '+d.day+' money report'))}</h3><p class="mut">Day ${d.day} · from Bea, Bookkeeping ${srcTag(rep.src)}</p>
+    <div class="say big">${esc(rep.summary)}</div>
+    ${rep.tips&&rep.tips.length?`<ul class="tips">${rep.tips.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
+    <div class="money">
+      <div><span>Units sold</span><b>${d.unitsSold}</b></div>
+      <div><span>Sales</span><b>${$$(d.sales)}</b></div>
+      <div><span>After Amazon fees</span><b>${$$(d.afterFees)}</b></div>
+      <div><span>Refunds</span><b>${d.refunds}</b></div>
+      <div><span>AI agent costs</span><b class="r">-${$$(d.agentCosts)}</b></div>
+      <div><span>Cash in bank</span><b>${$$(d.cash)}</b></div>
+      <div><span>Pending payout</span><b>${$$(d.pendingPayout)}</b></div>
+      <div><span>Inventory</span><b>${d.inventoryUnits} units (${$0(d.inventoryCost)})</b></div>
+      <div><span>Total worth</span><b class="${worth>=1000?'g':'r'}">${$0(worth)}</b></div>
+      <div><span>vs. $1,000 start</span><b class="${worth>=1000?'g':'r'}">${worth>=1000?'+':''}${$0(worth-1000)}</b></div>
+    </div>
+    <h4>Since you started</h4>
+    <div class="money">
+      <div><span>Spent on inventory</span><b>${$$(tt.spentOnInventory)}</b></div>
+      <div><span>Sales</span><b>${$$(tt.sales)}</b></div>
+      <div><span>After fees</span><b>${$$(tt.afterFees)}</b></div>
+      <div><span>Agent costs</span><b>${$$(tt.agentCosts)}</b></div>
+    </div>`;
+}
+function aiView(){
+  const head=`<div class="aihead"><b>🧠 Agent brain log</b><span class="mut">${G.aiCalls} AI calls so far · ${G.aiOn&&AI?'AI is ON':'AI is OFF (agents use backup rules)'}</span></div>`;
+  if(!aiLog.length) return head+`<p class="mut center">${G.aiOn&&AI?'No AI decisions yet this session. They show up here as agents work.':'Turn on AI brains in the Team tab to watch each agent think here.'}</p>`;
+  return head+aiLog.map(e=>{
+    const st={waiting:'⏳ waiting',thinking:'🧠 thinking…',done:'✅ done',error:'⚠️ '+(e.err||'error')+' → backup rules',fallback:'⚠️ unreadable → backup rules'}[e.status];
+    return `<div class="ailog"><div class="lh"><span><i class="dotc" style="background:${e.color}"></i><b>${e.who}</b> · ${esc(e.label)}</span><span class="mut nowrap">${st}${e.ms?' · '+(e.ms/1000).toFixed(1)+'s':''}</span></div>
+      ${e.out?`<div class="aiout">${fmtOut(e.out)}</div>`:''}
+      <details><summary>Show what ${e.who} was asked</summary><pre>${esc(e.prompt)}</pre>${e.out?`<pre>${esc(JSON.stringify(e.out,null,1))}</pre>`:''}</details></div>`; }).join('');
+}
+function fmtOut(o){
+  try{
+    if(o.picks) return `<p>${esc(o.summary)}</p>`+o.picks.map(p=>`<div>• <b>${esc(p.verdict)}</b>${p.qty?` (${p.qty} units)`:''}: ${esc(p.note)}</div>`).join('');
+    if(o.items) return o.items.map(i=>`<div>• ${i.price!==undefined?`<b>$${esc(i.price)}</b> `:''}${i.stable!==undefined?(i.stable?'<b>stable</b> ':'<b>unstable</b> '):''}${i.risk?`<b>${esc(i.risk)} risk</b> `:''}${i.action?`<b>${esc(i.action)}</b>: “${esc(i.reply)}” `:''}${esc(i.note||'')}</div>`).join('');
+    if(o.headline) return `<p><b>${esc(o.headline)}</b></p><p>${esc(o.summary)}</p>`;
+    if(o.po) return `<div><b>${esc(o.po)}</b>: ${esc(o.note)} ${o.warning?'⚠️ '+esc(o.warning):''}</div>`;
+    if(o.prep) return `<div><b>${esc(o.boxes)} box(es)</b>: ${o.prep.map(esc).join('; ')}</div><div>${esc(o.note)}</div>`;
+    if(o.line) return `<div>${esc(o.line)}</div>`;
+  }catch(e){}
+  return `<div>${esc(JSON.stringify(o)).slice(0,300)}</div>`;
+}
+let confirmNew=false;
+function renderSheet(){
+  let h='';
+  if(tab==='reports'){
+    if(openRep){ const rep=G.reports.find(r=>r.id===openRep); h=rep?reportView(rep):''; }
+    if(!h){ openRep=null;
+      if(G.pendingReport) h+=`<div class="ritem pending"><div><b>⏳ Product report in progress</b><span class="mut">${!G.pendingReport.rexDone?'Rex is checking price history':'Ivy is checking IP risk'}…</span></div></div>`;
+      h += G.reports.length ? G.reports.map(r=>{
+        const pend = r.type==='products' ? r.leads.filter(l=>!l.decision).length : 0;
+        return `<div class="ritem" data-a="open" data-r="${r.id}">${r.read?'':'<i class="dot"></i>'}
+          <div><b>${r.type==='lots'?`🏗️ Liquidation report · ${r.lots.length} lot${r.lots.length===1?'':'s'}`:r.type==='products'?`📋 Product report · ${r.leads.length} match${r.leads.length===1?'':'es'}`:r.type==='brief'?`🗂️ ${esc(r.from)}: ${esc(r.title||'Report')}`:'📊 '+esc(r.headline||('Day '+r.d.day+' money report'))}</b>
+          <span class="mut">from ${r.from}${r.type==='lots'?` · Day ${r.day} · ${!r.lots.length?'nothing passed':r.lots.some(l=>!l.decision)?r.lots.filter(l=>!l.decision).length+' waiting on you':'all decided'}`:r.type==='products'?` · Day ${r.day} · ${!r.leads.length?'nothing passed':pend?pend+' waiting on you':'all decided'}`:` · Day ${r.type==='brief'?r.day:r.d.day}`}</span></div><span class="chev">›</span></div>`; }).join('')
+        : (G.pendingReport?'':`<p class="mut center">No reports yet. Scout is reviewing today’s leads. Check back soon, or tap Scout if they're slacking! 🔍</p>`);
+    }
+  } else if(tab==='ai'){ h=aiView();
+  } else if(tab==='products'){
+    const label={order:'Waiting for Stocky to order',to3pl:'In transit to 3PL',at3pl:'At 3PL: needs FBA shipment',toFBA:'In transit to Amazon',live:'Live & selling',done:'Sold out',suppressed:'Suppressed (IP complaint)'};
+    const pct={order:.05,to3pl:.25,at3pl:.45,toFBA:.65,live:.85,done:1,suppressed:1};
+    h = G.purchases.length ? G.purchases.map(p=>{
+      const invested=p.qty*(p.cost+p.lead.prep), profit=p.net-invested;
+      const L=p.comps&&p.comps.length?lowComp(p):Infinity;
+      const extra = p.stage==='to3pl'||p.stage==='toFBA' ? ` · ~${Math.max(0,p.t).toFixed(1)} days` : p.stage==='live' ? ` · ${$$(p.price)} <span class="mut">(lowest offer ${isFinite(L)?$$(L):'none'})</span>` : '';
+      return `<div class="prod"><div class="lh"><b>${p.name}</b><span class="mut">${p.qty} units</span></div>
+        <div class="stage ${p.stage}">${label[p.stage]}${extra}</div>
+        <div class="pbar"><i style="width:${pct[p.stage]*100}%" class="${p.stage}"></i></div>${p.walmart?`<div class="wm">🟦 Also on Walmart · ${p.walmart.sold} sold there</div>`:''}
+        <div class="pr"><span>Sold <b>${p.sold}</b> · Left <b>${p.stock}</b></span><span>${profit>=0?`Profit <b class="g">${$0(profit)}</b>`:`Earned back <b>${$0(p.net)}</b> of ${$0(invested)}`}</span></div>
+        ${(p.notes||[]).slice(0,3).map(n=>`<div class="note"><b>${n.who}:</b> ${esc(n.text)} ${srcTag(n.src)}</div>`).join('')}</div>`; }).join('')
+      + (G.messages.some(m=>m.done)?`<h4>💬 Recent buyer messages</h4>`+G.messages.filter(m=>m.done).slice(-6).reverse().map(m=>`<div class="note msg"><b>Buyer (${esc(m.product)}):</b> “${esc(m.text)}”<br><b>${m.who}:</b> ${String(m.action).toUpperCase()}. “${esc(m.reply)}” ${srcTag(m.src)}${m.note?`<br><span class="r">${esc(m.note)}</span>`:''}</div>`).join(''):'')
+      : `<p class="mut center">No products yet. Approve leads from Scout's reports and they'll show up here as they move supplier → 3PL → Amazon.</p>`;
+    if(G.lots&&G.lots.length) h+=`<h4>🏗️ Liquidation lots</h4>`+G.lots.map(lotRow).join('');
+  } else {
+    const aiCard = `<div class="aicard ${G.aiOn&&AI?'on':''}"><div><b>🧠 AI brains: ${!aiReady?'checking…':!AI?'not available here':G.aiOn?'ON':'OFF'}</b>
+      <span>${aiReady&&!AI?'Open this in the Claude app or on claude.ai to let agents think with Claude. Until then they use backup rules.':'When ON, every agent thinks with Claude: Scout picks products, Rex reads price charts, Ivy judges IP risk, Stocky writes POs, Lexi plans shipments, Penny sets prices, Hana answers buyers, Bea writes your report. It uses your Claude usage (<b>'+G.aiCalls+'</b> calls so far). When OFF, they follow simple backup rules.'}</span></div>
+      ${AI?`<button class="hire" data-a="ai">${G.aiOn?'Turn off':'Turn on'}</button>`:''}</div>`;
+    const saveCard = `<div class="savecard"><span>💾 ${esc(saveStatus)}</span><button class="skipb" data-a="new">${confirmNew?'Tap again to erase & restart':'New game'}</button></div>`;
+    h = `<div class="aicard"><div><b>📏 Rules mode</b><span>Agents follow your buy rules and simple built-in logic. No AI, so nothing uses your Claude usage.</span></div></div>` + `<p class="mut">Each agent costs ${$0(WAGE)}/day in pretend AI costs. Hiring is a one-time fee.</p>` + ROLES.map((r,idx)=>{
+      const a=hiredA(r.key);
+      return `${r.key==='liq'?'<h4>🏬 Marketplace wing</h4>':''}<div class="team"><div class="av" style="background:${r.shirt}">${r.name[0]}</div>
+        <div class="ti"><b>${r.name} · ${r.role}</b><span>${r.does}</span>${a?`<span class="mut">${a.done} tasks done · ${a.queue.length} waiting</span>`:''}</div>
+        ${a?'<span class="hired">Hired</span>':`<button class="hire" data-a="hire" data-i="${idx}" ${G.cash<r.hire?'disabled':''}>Hire ${$0(r.hire)}</button>`}</div>`; }).join('') + saveCard;
+  }
+  body.innerHTML=h;
+}
+body.addEventListener('click',e=>{
+  const b=e.target.closest('[data-a]'); if(!b) return; const act=b.dataset.a;
+  if(act==='open'){ openRep=+b.dataset.r; renderSheet(); body.scrollTop=0; return; }
+  if(act==='back'){ openRep=null; renderSheet(); return; }
+  if(act==='hire'){ const r=ROLES[+b.dataset.i]; if(G.cash<r.hire) return; G.cash-=r.hire; G.total.overhead+=r.hire;
+    agents.push(makeAgent(+b.dataset.i)); notify(`👋 You hired ${r.name} (${r.role})`);
+    if(r.key==='walmart') G.purchases.filter(p=>p.stage==='live').forEach(queueWalmart);
+    if(r.key==='ebay'){ G.lots.filter(L=>L.stage==='arrived').forEach(L=>queueTask('ebay',{kind:'listlot',title:'List lot on eBay: '+L.name,dur:8,ref:L.id})); }
+    markSave(); renderSheet(); return; }
+  if(act==='ai'){ toggleAI(); return; }
+  if(act==='new'){ if(!confirmNew){ confirmNew=true; renderSheet(); setTimeout(()=>{ confirmNew=false; renderSheetSoon(); },4000); return; } confirmNew=false; newGame(); return; }
+  const rep=G.reports.find(r=>r.id===openRep); if(!rep) return;
+  if(act==='lotbuy'||act==='lotskip'){ const lt=rep.lots.find(x=>x.id===+b.dataset.l); if(!lt||lt.decision) return; const y=body.scrollTop;
+    if(act==='lotbuy') approveLot(rep,lt); else { lt.decision={skip:true}; markSave(); } renderSheet(); body.scrollTop=y; return; }
+  if(!rep.leads) return; const l=rep.leads.find(x=>x.id===+b.dataset.l); if(!l||l.decision) return;
+  const afford=Math.floor(Math.max(0,G.cash)/l.cost);
+  if(act==='minus'){ l.qty=Math.max(0,l.qty-(l.qty>20?5:1)); }
+  if(act==='plus'){ l.qty=Math.min(afford,l.qty+(l.qty>=20?5:1)); }
+  if(act==='skip'){ skip(rep,l); return; }
+  if(act==='buy'){ const y=body.scrollTop; approve(rep,l,l.qty); body.scrollTop=y; return; }
+  const y=body.scrollTop; renderSheet(); body.scrollTop=y;
+});
+btnWhistle.onclick=()=>{ let n=0; agents.forEach(a=>{ if(isSlacking(a)&&a.queue.length&&sendToWork(a,true)) n++; });
+  log(n?`📣 Back to work! (${n} agent${n>1?'s':''})`:'📣 Nobody on break has work waiting'); };
+
+// ================= AI on/off =================
+async function toggleAI(){
+  if(!AI){ notify('🧠 AI isn’t available in this view.'); return; }
+  if(G.aiOn){ G.aiOn=false; notify('🧠 AI brains off. Agents use backup rules.'); markSave(); renderSheet(); updStats(); return; }
+  G.aiOn=true; if(speed>4){ speed=4; speedBtn.textContent='4×'; }
+  renderSheet(); updStats();
+  const s=hiredA('scout')||agents[0];
+  try{ const {out}=await think(s,'Team check-in',`${INTRO(s.name,s.role)}\nThe AI team just came online. Reply with only JSON: {"line":"one upbeat line (max 12 words) to Royce saying the team is online"}`,'quick');
+    s.bubble=S(out&&out.line,80)||'AI team online! 🧠'; s.bubbleT=4; notify('🧠 AI brains ON. Open the 🧠 AI tab to watch every decision.'); }
+  catch(e){ if(G.aiOn) notify('🧠 AI couldn’t start ('+((e&&e.code)||'error')+'). Agents use backup rules for now.'); }
+  markSave(); renderSheet(); updStats();
+}
+
+// ================= start =================
+const appEl=document.getElementById('app'); appEl.addEventListener('scroll',()=>{appEl.scrollTop=0;appEl.scrollLeft=0;}); window.addEventListener('scroll',()=>window.scrollTo(0,0));
+resize(); updStats(); boot();
+window.__ggn={pos:()=>agents.map(a=>({key:a.key,state:a.state,x:offX+a.hx*scale,y:offY+(a.hy+30)*scale})), leads:()=>G.reports.filter(r=>r.type==='products').flatMap(r=>r.leads.map(l=>({name:l.name,pass:passesAll(l),rules:l.rules})))};
+let last=performance.now();
+function loop(nowT){ const dt=Math.min(.05,(nowT-last)/1000); last=nowT; step(dt); render(); updClock(); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+
+})();
+</script>
+<script>
+if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')) navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
