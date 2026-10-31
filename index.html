@@ -130,6 +130,11 @@ pre{white-space:pre-wrap;word-break:break-word;background:#f6f1e4;border-radius:
 #btnWhistle{flex:0 0 46px}
 .wm{font-size:11.5px;color:#0b5aa6;margin-top:5px;font-weight:700}
 .lot .grid{grid-template-columns:repeat(3,1fr)}
+.costcard{background:#fff;border:1px solid #eadfc6;border-radius:14px;padding:11px;margin:10px 0;display:flex;flex-direction:column;gap:5px}
+.costcard>span{font-size:11.5px;color:#5c564b;line-height:1.4;margin-bottom:3px}
+.crow{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;align-items:baseline}
+.crow span{display:flex;flex-direction:column} .crow i{font-style:normal;font-size:10.5px;color:#8a7f66}
+.crow.tot{border-top:1px solid #eadfc6;padding-top:6px;margin-top:2px;font-weight:800}
 header{padding-top:calc(9px + env(safe-area-inset-top))}
 footer{padding-bottom:calc(12px + env(safe-area-inset-bottom))}
 #sheetBody{padding-bottom:calc(30px + env(safe-area-inset-bottom))}
@@ -396,18 +401,26 @@ function walkTo(a, cx, cy, next){
 const SKIN=['#f1c9a5','#e0ac80','#c68a5e','#8d5a3b','#f5d6b8','#a86b45','#d9a47a','#b07a52','#c68a5e','#f1c9a5','#8d5a3b'];
 const ROLES=[
  {key:'scout', name:'Scout', role:'Product Scout',        shirt:'#3d6cf0',hair:'#2b1d14',style:'short',hire:0,  does:'Reviews candidate products against your buy rules and sends you a report.'},
- {key:'rex',   name:'Rex',   role:'Product Research',     shirt:'#1fa3b8',hair:'#4a2f1d',style:'short',hire:60, does:'Reads each lead’s 12-week price & seller history and flags prices likely to crash.'},
- {key:'ivy',   name:'Ivy',   role:'Compliance',           shirt:'#c0399b',hair:'#6b3a1e',style:'long', hire:60, does:'Judges IP-complaint risk for each lead before you buy.'},
+ {key:'rex',   name:'Rex',   role:'Product Research',     shirt:'#1fa3b8',hair:'#4a2f1d',style:'short',hire:0, does:'Reads each lead’s 12-week price & seller history and flags prices likely to crash.'},
+ {key:'ivy',   name:'Ivy',   role:'Compliance',           shirt:'#c0399b',hair:'#6b3a1e',style:'long', hire:0, does:'Judges IP-complaint risk for each lead before you buy.'},
  {key:'stocky',name:'Stocky',role:'Purchasing & 3PL',     shirt:'#f0a63a',hair:'#3a2a1a',style:'spiky',hire:0,  does:'Writes the purchase order for what you approve and sends it to the 3PL.'},
- {key:'lexi',  name:'Lexi',  role:'Shipments & Listings', shirt:'#e0457b',hair:'#6b3a1e',style:'long', hire:50, does:'Plans FBA shipments (boxes, prep). Without her, Stocky covers it slower.'},
+ {key:'lexi',  name:'Lexi',  role:'Shipments & Listings', shirt:'#e0457b',hair:'#6b3a1e',style:'long', hire:0, does:'Plans FBA shipments (boxes, prep). Without her, Stocky covers it slower.'},
  {key:'penny', name:'Penny', role:'Pricing',              shirt:'#2fb380',hair:'#151515',style:'bun',  hire:0,  does:'Studies competitor offers and sets your price every day to win the Buy Box.'},
- {key:'hana',  name:'Hana',  role:'Customer Support',     shirt:'#8a5cf0',hair:'#1a1a1a',style:'long', hire:50, does:'Reads buyer messages, writes replies, and decides refund / replace / reply.'},
+ {key:'hana',  name:'Hana',  role:'Customer Support',     shirt:'#8a5cf0',hair:'#1a1a1a',style:'long', hire:0, does:'Reads buyer messages, writes replies, and decides refund / replace / reply.'},
  {key:'bea',   name:'Bea',   role:'Bookkeeping',          shirt:'#7a8a3a',hair:'#2a1a12',style:'bun',  hire:0,  does:'Writes your end-of-day money report with advice.'},
- {key:'liq',   name:'Sal',   role:'Liquidation Buyer',    shirt:'#8d6e4c',hair:'#3a2a1a',style:'curly',hire:75, wing:true, does:'Checks liquidation lots against your lot rules and sends you a bid report. Never bids without your OK.'},
- {key:'ebay',  name:'Eli',   role:'eBay Seller',          shirt:'#e53238',hair:'#151515',style:'short',hire:60, wing:true, does:'Lists liquidation items on eBay, answers Best Offers and ships orders every day.'},
- {key:'walmart',name:'Wally',role:'Walmart Seller',       shirt:'#0071ce',hair:'#d9b36a',style:'spiky',hire:60, wing:true, does:'Lists your live Amazon products on Walmart Marketplace (WFS) for extra sales.'},
+ {key:'liq',   name:'Sal',   role:'Liquidation Buyer',    shirt:'#8d6e4c',hair:'#3a2a1a',style:'curly',hire:0, wing:true, does:'Checks liquidation lots against your lot rules and sends you a bid report. Never bids without your OK.'},
+ {key:'ebay',  name:'Eli',   role:'eBay Seller',          shirt:'#e53238',hair:'#151515',style:'short',hire:0, wing:true, does:'Lists liquidation items on eBay, answers Best Offers and ships orders every day.'},
+ {key:'walmart',name:'Wally',role:'Walmart Seller',       shirt:'#0071ce',hair:'#d9b36a',style:'spiky',hire:0, wing:true, does:'Lists your live Amazon products on Walmart Marketplace (WFS) for extra sales.'},
 ];
-const WAGE=3;
+const WAGE=0;   // bots themselves are free
+// Realistic monthly business costs (charged a little each game day = monthly / 30).
+const COSTS=[
+  {name:'Amazon Professional seller plan', monthly:39.99, why:'needed to sell on Amazon'},
+  {name:'Keepa API (Scout & Rex data)', monthly:57, why:'sales rank, sales history & price data (€49 ≈ $57)'},
+  {name:'Server for the bots', monthly:7, why:'keeps the bots running 24/7 (estimate)'},
+];
+function dailyCosts(){ const items=COSTS.slice(); if(G.aiOn) items.push({name:'Claude Pro (bot brains)',monthly:20,why:'AI thinking for the bots'});
+  const monthly=items.reduce((s,i)=>s+i.monthly,0); return {items, monthly:r2(monthly), total:r2(monthly/30)}; }
 const GOSSIP=["Did you see that ROI? 👀","Scout's leads are 🔥 today","Penny reprices in her sleep","Is it payout day yet?",
   "Don't tell Royce I'm on break 🤫","Amazon fees are wild","Stocky lost a tracking number again 😂","Rematch after this?",
   "Bea knows exactly how much we made 😳","Five more minutes, then I'll work…","I heard we might hire more agents","The 3PL is so slow today",
@@ -541,9 +554,9 @@ const TASKS={
     fallback(){ const out={}; for(const l of G.pendingReport.leads) out[l.id]={risk:l.ip?'high':'low', note:`${l.ipInfo.brand}; ${l.ipInfo.complaintReports} complaint report(s).`}; return out; },
     apply(tk,res,src){ const pr=G.pendingReport; for(const l of pr.leads){ l.ivy={...(res[l.id]||{risk:'medium',note:'No read.'}),src}; l.ipFail=l.ivy.risk==='high'; } pr.ivyDone=true; nextCheck(); }},
   order:{
-    prompt:tk=>{ const p=P(tk.ref); return `${INTRO('Stocky','Purchasing & 3PL')}\nRoyce approved this purchase. Write the purchase order and a status line for him. Everything ships from the store to our 3PL first (for the paper trail), then to Amazon FBA.\n${JSON.stringify({product:p.name,store:p.lead.store,units:p.qty,unitCost:p.cost,total:r2(p.qty*p.cost),cashLeftAfter:r2(G.cash),dailyAgentCosts:agents.length*WAGE,otherOpenOrders:G.purchases.filter(x=>['order','to3pl'].includes(x.stage)).length-1})}\nIf cash left is under 5 days of agent costs, add a short warning. Reply with only JSON: {"po":"PO-number you make up","note":"one sentence status","warning":"" }`; },
+    prompt:tk=>{ const p=P(tk.ref); return `${INTRO('Stocky','Purchasing & 3PL')}\nRoyce approved this purchase. Write the purchase order and a status line for him. Everything ships from the store to our 3PL first (for the paper trail), then to Amazon FBA.\n${JSON.stringify({product:p.name,store:p.lead.store,units:p.qty,unitCost:p.cost,total:r2(p.qty*p.cost),cashLeftAfter:r2(G.cash),dailyBusinessCosts:dailyCosts().total,otherOpenOrders:G.purchases.filter(x=>['order','to3pl'].includes(x.stage)).length-1})}\nIf cash left is under 5 days of agent costs, add a short warning. Reply with only JSON: {"po":"PO-number you make up","note":"one sentence status","warning":"" }`; },
     parse(tk,ai){ if(!ai||!ai.note) throw 0; return {po:S(ai.po,30)||('PO-'+tk.ref), note:S(ai.note), warning:S(ai.warning)}; },
-    fallback(tk){ const p=P(tk.ref); return {po:'PO-'+(1000+p.id), note:`Ordered ${p.qty}× from ${p.lead.store}, shipping to the 3PL.`, warning:G.cash<agents.length*WAGE*5?'Cash is getting low.':''}; },
+    fallback(tk){ const p=P(tk.ref); return {po:'PO-'+(1000+p.id), note:`Ordered ${p.qty}× from ${p.lead.store}, shipping to the 3PL.`, warning:G.cash<dailyCosts().total*5?'Cash is getting low.':''}; },
     apply(tk,res,src){ const p=P(tk.ref); if(!p) return; p.po=res.po; addNote(p,'Stocky',res.note+(res.warning?' ⚠️ '+res.warning:''),src);
       p.stage='to3pl'; p.t=1; log(`📦 Stocky sent ${res.po}: ${p.qty}× ${p.name} → 3PL`); }},
   ship:{
@@ -716,7 +729,7 @@ function briefData(key){
     case 'ebay': return {sellingLots:G.lots.filter(L=>L.stage==='selling').map(L=>({lot:L.name,listed:L.sellable,sold:L.sold,revenue:r2(L.revenue),allIn:L.allIn})), waitingToList:G.lots.filter(L=>L.stage==='arrived').length};
     case 'walmart': return {listedOnWalmart:G.purchases.filter(p=>p.walmart).map(p=>({name:p.name,walmartSold:p.walmart.sold,unitsLeft:p.stock})), liveNotListed:G.purchases.filter(p=>p.stage==='live'&&!p.walmart).length};
     case 'bea': return {day:G.day, today:{unitsSold:G.today.units,sales:r2(G.today.revenue),afterFees:r2(G.today.net)}, cash:r2(G.cash), pendingPayout:r2(G.pending), nextPayoutInDays:G.nextPayout-G.day,
-      inventoryUnits:stockUnits(), inventoryCost:r2(stockValue()), totalWorth:r2(G.cash+G.pending+stockValue()), startedWith:1000, sinceStart:G.total, agentsOnPayroll:agents.length, costPerDay:agents.length*WAGE};
+      inventoryUnits:stockUnits(), inventoryCost:r2(stockValue()), totalWorth:r2(G.cash+G.pending+stockValue()), startedWith:1000, sinceStart:G.total, agentsHired:agents.length, businessCostsPerDay:dailyCosts().total, businessCostsPerMonth:dailyCosts().monthly};
   }
   return {};
 }
@@ -732,7 +745,7 @@ function briefFallback(key){
     case 'liq': return {title:'Liquidation check-in',summary:`${d.lotsBidOn.length} lot(s) bought or bid on.`,bullets:list(d.lotsBidOn,l=>`${l.lot}: ${l.stage} (all-in ${$0(l.allIn)})`)};
     case 'ebay': return {title:'eBay check-in',summary:`${d.sellingLots.length} lot(s) selling, ${d.waitingToList} waiting to be listed.`,bullets:list(d.sellingLots,l=>`${l.lot}: sold ${l.sold}/${l.listed}, ${$0(l.revenue)} sales vs ${$0(l.allIn)} cost`)};
     case 'walmart': return {title:'Walmart check-in',summary:`${d.listedOnWalmart.length} product(s) listed on Walmart, ${d.liveNotListed} live on Amazon but not on Walmart yet.`,bullets:list(d.listedOnWalmart,p=>`${p.name}: ${p.walmartSold} sold on Walmart, ${p.unitsLeft} left`)};
-    case 'bea': return {title:`Money check-in (Day ${d.day})`,summary:`Cash ${$$(d.cash)}, pending payout ${$$(d.pendingPayout)}, inventory ${$$(d.inventoryCost)}. Total worth ${$$(d.totalWorth)} vs $1,000 start.`,bullets:[`Sold ${d.today.unitsSold} today for ${$$(d.today.sales)}`,`Payroll ${$$(d.costPerDay)}/day`]};
+    case 'bea': return {title:`Money check-in (Day ${d.day})`,summary:`Cash ${$$(d.cash)}, pending payout ${$$(d.pendingPayout)}, inventory ${$$(d.inventoryCost)}. Total worth ${$$(d.totalWorth)} vs $1,000 start.`,bullets:[`Sold ${d.today.unitsSold} today for ${$$(d.today.sales)}`,`Business costs ${$$(d.businessCostsPerDay)}/day (${$0(d.businessCostsPerMonth)}/month)`]};
   }
   return {title:'Report',summary:'Nothing to report.',bullets:[]};
 }
@@ -830,7 +843,7 @@ function simBusiness(dt){
   if(hiredA('scout') && !G.hunting && G.reports.filter(r=>r.type==='products' && r.leads.some(l=>!l.decision)).length<2 && now()>=(G.nextHuntAt||0)) queueHunt();
 }
 function endOfDay(){
-  const wages=agents.length*WAGE; G.cash-=wages; G.total.overhead+=wages;
+  const wages=dailyCosts().total; G.cash-=wages; G.total.overhead+=wages;
   const d={day:G.day, unitsSold:G.today.units, sales:r2(G.today.revenue), afterFees:r2(G.today.net), refunds:G.today.returns, agentCosts:wages,
     cash:r2(G.cash), pendingPayout:r2(G.pending), nextPayoutInDays:G.nextPayout-G.day-1, inventoryUnits:stockUnits(), inventoryCost:r2(stockValue()),
     sinceStart:{spentOnInventory:r2(G.total.spent),sales:r2(G.total.revenue),afterFees:r2(G.total.net),agentCosts:r2(G.total.overhead),refunds:r2(G.total.refunds)},
@@ -1326,7 +1339,7 @@ function reportView(rep){
       <div><span>Sales</span><b>${$$(d.sales)}</b></div>
       <div><span>After Amazon fees</span><b>${$$(d.afterFees)}</b></div>
       <div><span>Refunds</span><b>${d.refunds}</b></div>
-      <div><span>AI agent costs</span><b class="r">-${$$(d.agentCosts)}</b></div>
+      <div><span>Business costs</span><b class="r">-${$$(d.agentCosts)}</b></div>
       <div><span>Cash in bank</span><b>${$$(d.cash)}</b></div>
       <div><span>Pending payout</span><b>${$$(d.pendingPayout)}</b></div>
       <div><span>Inventory</span><b>${d.inventoryUnits} units (${$0(d.inventoryCost)})</b></div>
@@ -1338,7 +1351,7 @@ function reportView(rep){
       <div><span>Spent on inventory</span><b>${$$(tt.spentOnInventory)}</b></div>
       <div><span>Sales</span><b>${$$(tt.sales)}</b></div>
       <div><span>After fees</span><b>${$$(tt.afterFees)}</b></div>
-      <div><span>Agent costs</span><b>${$$(tt.agentCosts)}</b></div>
+      <div><span>Business costs</span><b>${$$(tt.agentCosts)}</b></div>
     </div>`;
 }
 function aiView(){
@@ -1396,11 +1409,13 @@ function renderSheet(){
       <span>${aiReady&&!AI?'Open this in the Claude app or on claude.ai to let agents think with Claude. Until then they use backup rules.':'When ON, every agent thinks with Claude: Scout picks products, Rex reads price charts, Ivy judges IP risk, Stocky writes POs, Lexi plans shipments, Penny sets prices, Hana answers buyers, Bea writes your report. It uses your Claude usage (<b>'+G.aiCalls+'</b> calls so far). When OFF, they follow simple backup rules.'}</span></div>
       ${AI?`<button class="hire" data-a="ai">${G.aiOn?'Turn off':'Turn on'}</button>`:''}</div>`;
     const saveCard = `<div class="savecard"><span>💾 ${esc(saveStatus)}</span><button class="skipb" data-a="new">${confirmNew?'Tap again to erase & restart':'New game'}</button></div>`;
-    h = `<div class="aicard"><div><b>📏 Rules mode</b><span>Agents follow your buy rules and simple built-in logic. No AI, so nothing uses your Claude usage.</span></div></div>` + `<p class="mut">Each agent costs ${$0(WAGE)}/day in pretend AI costs. Hiring is a one-time fee.</p>` + ROLES.map((r,idx)=>{
+    h = `<div class="aicard"><div><b>📏 Rules mode</b><span>Agents follow your buy rules and simple built-in logic. No AI, so nothing uses your Claude usage.</span></div></div>` + (()=>{ const c=dailyCosts(); return `<div class="costcard"><b>💸 Monthly business costs</b><span>The bots themselves are free. These are what running the real business would cost, charged a little each day.</span>
+      ${c.items.map(x=>`<div class="crow"><span>${esc(x.name)}<i>${esc(x.why)}</i></span><b>${$$(x.monthly)}/mo</b></div>`).join('')}
+      <div class="crow tot"><span>Total</span><b>${$$(c.monthly)}/mo · ${$$(c.total)}/day</b></div></div>`; })() + ROLES.map((r,idx)=>{
       const a=hiredA(r.key);
       return `${r.key==='liq'?'<h4>🏬 Marketplace wing</h4>':''}<div class="team"><div class="av" style="background:${r.shirt}">${r.name[0]}</div>
         <div class="ti"><b>${r.name} · ${r.role}</b><span>${r.does}</span>${a?`<span class="mut">${a.done} tasks done · ${a.queue.length} waiting</span>`:''}</div>
-        ${a?'<span class="hired">Hired</span>':`<button class="hire" data-a="hire" data-i="${idx}" ${G.cash<r.hire?'disabled':''}>Hire ${$0(r.hire)}</button>`}</div>`; }).join('') + saveCard;
+        ${a?'<span class="hired">Hired</span>':`<button class="hire" data-a="hire" data-i="${idx}" ${G.cash<r.hire?'disabled':''}>Hire</button>`}</div>`; }).join('') + saveCard;
   }
   body.innerHTML=h;
 }
