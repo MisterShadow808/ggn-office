@@ -140,6 +140,17 @@ pre{white-space:pre-wrap;word-break:break-word;background:#f6f1e4;border-radius:
 .budget>span:first-child{flex:1;font-size:12.5px} .dollar{font-size:18px}
 .budget input{width:120px;font-size:18px;font-weight:800;border:0;outline:0;background:transparent;text-align:right;font-family:inherit;color:#2a2620}
 .row2{display:flex;gap:8px;justify-content:flex-end}
+.mkts{display:flex;flex-direction:column;gap:5px;margin:8px 0}
+.mk{display:grid;grid-template-columns:1.25fr repeat(4,1fr);gap:2px 4px;align-items:center;text-align:left;background:#f6f1e4;border:2px solid transparent;border-radius:10px;padding:6px 8px;color:#2a2620;font-weight:600}
+.mk.sel{border-color:#3d6cf0;background:#eef3ff} .mk.fail{opacity:.75}
+.mk:disabled{color:#2a2620}
+.mn{font-size:12.5px;font-weight:800;white-space:nowrap} .mn i{font-style:normal;font-size:9.5px;background:#36b37e;color:#fff;border-radius:6px;padding:1px 5px;margin-left:4px;vertical-align:1px}
+.mv{display:flex;flex-direction:column;line-height:1.1} .mv b{font-size:12.5px} .mv small{font-size:9.5px;color:#8a7f66;font-weight:700}
+.mw{grid-column:1/-1;font-size:10.5px;font-weight:700}
+.amzline{font-size:11.5px;color:#5c564b;margin:4px 0}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+.cmp>div{background:#fff;border:1px solid #eadfc6;border-radius:12px;padding:9px;display:flex;flex-direction:column;gap:3px;font-size:12.5px}
+.cmp>div.hl{border:2px solid #36b37e;background:#f1fbf5}
 header{padding-top:calc(9px + env(safe-area-inset-top))}
 footer{padding-bottom:calc(12px + env(safe-area-inset-bottom))}
 #sheetBody{padding-bottom:calc(30px + env(safe-area-inset-bottom))}
@@ -414,8 +425,8 @@ const ROLES=[
  {key:'hana',  name:'Hana',  role:'Customer Support',     shirt:'#8a5cf0',hair:'#1a1a1a',style:'long', hire:0, does:'Reads buyer messages, writes replies, and decides refund / replace / reply.'},
  {key:'bea',   name:'Bea',   role:'Bookkeeping',          shirt:'#7a8a3a',hair:'#2a1a12',style:'bun',  hire:0,  does:'Writes your end-of-day money report with advice.'},
  {key:'liq',   name:'Sal',   role:'Liquidation Buyer',    shirt:'#8d6e4c',hair:'#3a2a1a',style:'curly',hire:0, wing:true, does:'Checks liquidation lots against your lot rules and sends you a bid report. Never bids without your OK.'},
- {key:'ebay',  name:'Eli',   role:'eBay Seller',          shirt:'#e53238',hair:'#151515',style:'short',hire:0, wing:true, does:'Lists liquidation items on eBay, answers Best Offers and ships orders every day.'},
- {key:'walmart',name:'Wally',role:'Walmart Seller',       shirt:'#0071ce',hair:'#d9b36a',style:'spiky',hire:0, wing:true, does:'Lists your live Amazon products on Walmart Marketplace (WFS) for extra sales.'},
+ {key:'ebay',  name:'Eli',   role:'eBay Seller',          shirt:'#e53238',hair:'#151515',style:'short',hire:0, wing:true, does:'Hunts eBay for deals, runs your eBay listings (incl. liquidation lots), and suggests moving slow Amazon sellers to eBay.'},
+ {key:'walmart',name:'Wally',role:'Walmart Seller',       shirt:'#0071ce',hair:'#d9b36a',style:'spiky',hire:0, wing:true, does:'Hunts Walmart for deals, runs your Walmart (WFS) listings, and suggests moving slow Amazon sellers to Walmart.'},
 ];
 const WAGE=0;   // bots themselves are free
 // Realistic monthly business costs (charged a little each game day = monthly / 30).
@@ -446,7 +457,7 @@ const DAY=45;
 let speed=1;
 function freshState(budget=1000){ return {v:3, cash:budget, startBudget:budget, pending:0, day:1, time:.375, nextPayout:3, reports:[], purchases:[], messages:[], nid:1,
   total:{units:0,revenue:0,net:0,spent:0,overhead:0,refunds:0}, today:{units:0,revenue:0,net:0,returns:0},
-  hunting:false, pendingReport:null, lots:[], lotHunting:false, nextLotHuntAt:0, hired:['scout','stocky','penny','bea'], queues:{}, aiOn:false, aiCalls:0, started:Date.now()}; }
+  hunting:false, pendingReport:null, pendings:[], hunts:{}, nextHunt:{}, lots:[], lotHunting:false, nextLotHuntAt:0, hired:['scout','stocky','penny','bea'], queues:{}, aiOn:false, aiCalls:0, started:Date.now()}; }
 let G=freshState();
 const now=()=>G.day+G.time;
 const START=()=>G.startBudget||1000;
@@ -464,7 +475,7 @@ const PRODUCTS=["Stainless Mixing Bowl Set (5-pc)","Silicone Baking Mat 2-Pack",
  "Electric Milk Frother","Shoe Rack 3-Tier","Silicone Ice Cube Trays 4-Pack","Travel Neck Pillow","Kids Science Experiment Kit"];
 const STORES=["Walmart.com","Target.com","Kohls.com","HomeDepot.com","Walgreens.com","BigLots.com","Macys.com","BestBuy.com"];
 
-function makeCandidate(usedNames){
+function makeCandidate(usedNames, forcedStore){
   let name; do{ name=pick(PRODUCTS); }while(usedNames.has(name)); usedNames.add(name);
   const cost=r2(rr2(5,28))-0.01;
   const buyBox=Math.round(cost*(Math.random()<.2?rr2(1.45,1.85):rr2(1.9,3.0)))-0.01;
@@ -487,11 +498,12 @@ function makeCandidate(usedNames){
       complaintReports:Math.floor(rr2(2,10)), chatter:pick(['Several sellers say they got IP complaints after listing this','Brand is known to send complaints to resellers','Listing was suppressed for some sellers last month'])}
     : {brand:pick(['Generic / unbranded','Small private-label brand','Store-brand bundle','Unbranded import']),
       complaintReports:Math.random()<.3?1:0, chatter:pick(['No complaint reports found','One old, unconfirmed complaint report','Many resellers on the listing with no issues reported'])};
-  const lead={id:G.nid++, name, store:pick(STORES), cost, buyBox, ourPrice, fba, prep, profit, roi:r2(profit/cost),
+  const lead={id:G.nid++, name, store:forcedStore||pick(STORES), cost, buyBox, ourPrice, fba, prep, profit, roi:r2(profit/cost),
     bsr, monthly, salesHist, sellers, amazon, share, volatile, ip, hist, offers, ipInfo, trueMonthly:monthly*rr2(.55,1.25), decision:null, qty:0};
   const avg=(salesHist[0]+salesHist[1]+salesHist[2])/3;
   lead.above=r2(above*100);
   lead.rules={bsr:bsr<=REQ.bsrMax, amazon:!amazon, sellers:sellers>=REQ.minSellers, price:above<=REQ.maxAbove, profit:lead.roi>=REQ.minROI, trend:monthly>=avg*REQ.trendMin};
+  addMarkets(lead);
   return lead;
 }
 const REQ={bsrMax:100000, minSellers:2, maxAbove:.03, minROI:.25, trendMin:.7};
@@ -530,35 +542,107 @@ const INTRO=(n,r)=>`You are ${n}, the ${r} AI agent at Global General Needs LLC,
 const RULES_TEXT=`Royce's requirements: (1) sales rank (BSR) 100,000 or better; (2) Amazon itself is not selling on the listing; (3) at least 2 other FBA sellers; (4) our price no more than 3% above the Buy Box; (5) ROI 25%+; (6) sales history steady, not falling (last month at least 70% of the 3-month average); (7) no IP problems (Ivy checks). Monthly share = last month's sales ÷ (FBA sellers + 1); size orders from about one month of share, using last month's sales. Agents never buy anything: Royce approves every purchase.`;
 const S=(v,n=300)=>String(v==null?'':v).slice(0,n);
 
+// ---------- marketplaces (Amazon / Walmart / eBay) ----------
+const MKTS=['amazon','walmart','ebay'];
+const MKT_LABEL={amazon:'Amazon',walmart:'Walmart',ebay:'eBay'};
+const MKT_ICON={amazon:'📦',walmart:'🟦',ebay:'🛍️'};
+function addMarkets(l){
+  const am={price:l.ourPrice, fees:r2(l.ourPrice*.15+l.fba), fixed:l.fba, ship:0, profit:l.profit, roi:l.roi, monthly:l.monthly, sellers:l.sellers, share:l.share, trueShare:l.share*(l.trueMonthly/l.monthly)};
+  am.why=ruleWhy(l); am.pass=!am.why.length;
+  // Walmart Marketplace, fulfilled by Walmart (WFS)
+  const wRetail=l.store==='Walmart.com'||Math.random()<.2;
+  const wp=r2(l.buyBox*rr2(.88,1.12)), wfs=r2(l.fba*rr2(.9,1.1)), wMonthly=Math.max(5,Math.round(l.monthly*rr2(.12,.55))), wSellers=Math.floor(rr2(0,6));
+  const wProfit=r2(wp-wp*.15-wfs-l.cost-l.prep);
+  const wm={price:wp, fees:r2(wp*.15+wfs), fixed:wfs, ship:0, profit:wProfit, roi:r2(wProfit/l.cost), monthly:wMonthly, sellers:wSellers, retail:wRetail,
+    share:Math.max(1,Math.round(wMonthly/(wSellers+1)*(wRetail?.2:1)))};
+  wm.trueShare=wm.share*rr2(.55,1.25);
+  wm.why=[]; if(l.store==='Walmart.com') wm.why.push('bought on Walmart'); else if(wRetail) wm.why.push('Walmart itself sells it');
+  if(wm.roi<.25) wm.why.push('ROI under 25%'); if(wMonthly<30) wm.why.push('under 30 sales/mo'); wm.pass=!wm.why.length;
+  // eBay, shipped to buyers from our 3PL
+  const ep=r2(l.buyBox*rr2(.72,1.02)), shipC=r2(rr2(5,9)), sold=Math.max(2,Math.round(l.monthly*rr2(.04,.3))), active=Math.floor(rr2(3,40));
+  const eProfit=r2(ep-(ep*.1325+.3)-shipC-l.cost-l.prep);
+  const eb={price:ep, fees:r2(ep*.1325+.3), fixed:r2(.3+shipC), ship:shipC, profit:eProfit, roi:r2(eProfit/l.cost), monthly:sold, sellers:active,
+    sellThrough:r2(sold/(sold+active)), share:Math.max(1,Math.round(sold*rr2(.15,.35)))};
+  eb.trueShare=eb.share*rr2(.55,1.25);
+  eb.why=[]; if(l.store==='eBay') eb.why.push('bought on eBay'); if(eb.roi<.25) eb.why.push('ROI under 25%'); if(sold<15) eb.why.push('under 15 sold/mo'); if(eb.sellThrough<.4) eb.why.push('slow sell-through');
+  eb.pass=!eb.why.length;
+  l.markets={amazon:am, walmart:wm, ebay:eb};
+  l.best=bestMarket(l); l.market=l.best||'amazon';
+}
+const passesAny=l=>!!l.markets && MKTS.some(m=>l.markets[m].pass);
+function bestMarket(l){ let b=null; for(const m of MKTS){ const x=l.markets[m]; if(x.pass && (!b || x.roi>l.markets[b].roi)) b=m; } return b; }
+const bestROI=l=>l.markets&&l.best?l.markets[l.best].roi:l.roi;
+function suggestQtyM(l,m){ const x=(l.markets||{})[m]; if(!x) return suggestQty(l); const cap=Math.floor(Math.max(0,G.cash)*.35/l.cost); return Math.max(0,Math.min(x.share,cap)); }
+function mktNote(l){ const b=l.best, x=l.markets[b], others=MKTS.filter(m=>m!==b&&l.markets[m].pass);
+  return `Best on ${MKT_LABEL[b]}: ${$$(x.profit)} profit/unit, ${Math.round(x.roi*100)}% ROI, ~${x.share}/mo for you.${others.length?' Also passes on '+others.map(m=>`${MKT_LABEL[m]} (${Math.round(l.markets[m].roi*100)}% ROI)`).join(', ')+'.':''}`; }
+const PR=tk=>(G.pendings||[]).find(x=>x.id===tk.ref)||(tk.ref==null?(G.pendings||[])[0]:null)||null;
+function queueDealHunt(key,onDemand){ const site=key==='ebay'?'eBay':'Walmart.com';
+  (G.hunts=G.hunts||{})[key]=true; (G.nextHunt=G.nextHunt||{})[key]=now()+1;
+  const t={kind:'hunt',title:`Hunt ${site} deals`,dur:onDemand?9:12,who:key,source:site,onDemand:!!onDemand};
+  const a=hiredA(key); if(onDemand&&a) a.queue.unshift(t); else queueTask(key,t); }
+function queueShip(p){ const ch=p.channel||'amazon';
+  if(ch==='amazon') queueTask('lexi',{kind:'ship',title:'FBA shipment: '+p.name,dur:6,ref:p.id},'stocky');
+  else if(ch==='walmart') queueTask('walmart',{kind:'shipwfs',title:'WFS shipment: '+p.name,dur:6,ref:p.id},hiredA('lexi')?'lexi':'stocky');
+  else queueTask('ebay',{kind:'ebaylist',title:'List on eBay: '+p.name,dur:6,ref:p.id},'stocky'); }
+function queueWmDaily(){ const w=hiredA('walmart'); if(!w) return; if(w.queue.some(x=>x.kind==='wmdaily')||(w.task&&w.task.kind==='wmdaily')) return;
+  queueTask('walmart',{kind:'wmdaily',title:'Reprice & tend Walmart listings',dur:5}); }
+const MOVE_FEE=1.10, MOVE_EST=1.60;   // Amazon removal fee per unit; + 3PL handling (estimate)
+function slowMoverChecks(){
+  for(const p of G.purchases){
+    if(p.stage!=='live'||(p.channel||'amazon')!=='amazon'||!p.markets||p.stock<3) continue;
+    if(now()-p.liveAt<2 || now()-(p.lastMoveCheck||0)<3) continue;
+    const h=p.soldHist||[]; const rate=h.length?h.reduce((a,b)=>a+b,0)/h.length:0;
+    if(p.stock/Math.max(rate,.1)<=30) continue;
+    p.lastMoveCheck=now();
+    for(const key of ['walmart','ebay']) if(hiredA(key)&&p.markets[key]) queueTask(key,{kind:'movecheck',title:`Check ${MKT_LABEL[key]} for ${p.name}`,dur:5,ref:p.id,market:key,rate:r2(rate)});
+  }
+}
+function approveMove(rep){
+  const p=P(rep.pid); if(!p||p.stage!=='live'||p.stock<1){ rep.decision={skip:true}; notify('That product is no longer available to move.'); return; }
+  const n=p.stock, fee=r2(n*MOVE_FEE); if(fee>G.cash){ notify('Not enough cash for the removal fee.'); return; }
+  G.cash-=fee; G.total.overhead+=fee; p.stock=0; p.movedOut=(p.movedOut||0)+n; p.stage='moved';
+  const x=p.markets[rep.market];
+  const q=JSON.parse(JSON.stringify(p));
+  Object.assign(q,{id:G.nid++, qty:n, stock:n, sold:0, soldToday:0, soldYday:0, soldHist:[], revenue:0, net:0, channel:rep.market, mk:{...x}, price:x.price,
+    comps:[], stage:'to3pl', t:2, liveAt:0, lastTended:0, notes:[], movedFrom:p.id, ipAt:null, crashAt:null, walmart:null});
+  addNote(q,rep.from,`Moved ${n} units from Amazon (removal fee ${$$(fee)}). Heading back to the 3PL, then ${MKT_LABEL[rep.market]}.`,'rules');
+  addNote(p,rep.from,`Moved ${n} units to ${MKT_LABEL[rep.market]}.`,'rules');
+  G.purchases.unshift(q); rep.decision={moved:n};
+  log(`🔀 Moving ${n}× ${p.name} from Amazon to ${MKT_LABEL[rep.market]}`); markSave(); updStats();
+}
+
 // ================= task handlers =================
 // task = {kind, title, dur, ref?, data?}   (transient runtime fields live under task._)
 const TASKS={
   hunt:{tier:'default',
-    begin(tk){ const used=new Set(); const all=Array.from({length:20},()=>makeCandidate(used));
-      const fails={}; for(const l of all) for(const w of ruleWhy(l)) fails[w]=(fails[w]||0)+1;
-      tk.data={cands:all.filter(passesAll), checked:all.length, fails}; },
+    begin(tk){ const used=new Set(); const all=Array.from({length:20},()=>makeCandidate(used,tk.source||null));
+      const fails={}; for(const l of all) if(!passesAny(l)) for(const w of ruleWhy(l)) fails[w]=(fails[w]||0)+1;
+      tk.data={cands:all.filter(passesAny), checked:all.length, fails}; },
     skipAI:tk=>!tk.data.cands.length,
-    prompt:tk=>`${INTRO('Scout','Product Scout')}\n${RULES_TEXT}\nCash available: ${$$(G.cash)}.\nYour tools checked ${tk.data.checked} products today. The code already removed every product that breaks a requirement, so ALL of these ${tk.data.cands.length} pass requirements 1-6 (JSON):\n${JSON.stringify(tk.data.cands.map(leadForAI))}\n\nRank them best first (up to 5) for Royce's report. For each, suggest a quantity: about one month of share based on last month's sales, never above maxUnitsAt35pctCash, at least 1. Reply with only JSON: {"summary":"1-2 sentences to Royce","picks":[{"id":number,"qty":number,"note":"1-2 sentences citing the numbers (BSR, sales history, share, ROI)"}]}`,
+    prompt:tk=>`${INTRO('Scout','Product Scout')}\n${RULES_TEXT}\nCash available: ${$$(G.cash)}.\nYour tools checked ${tk.data.checked} products today. ALL of these ${tk.data.cands.length} pass the rules on at least one marketplace (JSON):\n${JSON.stringify(tk.data.cands.map(l=>({...leadForAI(l),markets:Object.fromEntries(MKTS.map(m=>{ const {trueShare,...x}=l.markets[m]; return [m,x]; }))})))}\n\nRank them best first (up to 5). For each, suggest a quantity (about one month of share on its best marketplace, never above maxUnitsAt35pctCash, at least 1). Reply with only JSON: {"summary":"1-2 sentences to Royce","picks":[{"id":number,"qty":number,"note":"1-2 sentences citing the numbers"}]}`,
     parse(tk,ai){ const seen=new Set(), picks=[];
-      for(const p of (ai&&ai.picks)||[]){ const l=tk.data.cands.find(c=>c.id===+p.id); if(!l||seen.has(l.id)||!passesAll(l)) continue; seen.add(l.id);
-        const cap=Math.max(0,Math.floor(G.cash*.35/l.cost)); let q=Math.round(+p.qty||0); if(q<1) q=suggestQty(l);
+      for(const p of (ai&&ai.picks)||[]){ const l=tk.data.cands.find(c=>c.id===+p.id); if(!l||seen.has(l.id)||!passesAny(l)) continue; seen.add(l.id);
+        const cap=Math.max(0,Math.floor(G.cash*.35/l.cost)); let q=Math.round(+p.qty||0); if(q<1) q=suggestQtyM(l,l.market);
         picks.push({id:l.id, qty:Math.max(0,Math.min(cap,q)), note:S(p.note)}); }
       if(!picks.length) throw 0; return {summary:S(ai.summary,400), picks:picks.slice(0,5)}; },
-    fallback(tk){ const top=[...tk.data.cands].sort((a,b)=>b.roi-a.roi).slice(0,5);
-      return {summary:top.length?`Backup rules: ${top.length} of ${tk.data.checked} products passed every requirement, ranked by ROI.`:'', picks:top.map(l=>({id:l.id, qty:suggestQty(l), note:`BSR #${l.bsr.toLocaleString()}, sales ${l.salesHist.join(' → ')}/mo, share ~${l.share}/mo, ROI ${Math.round(l.roi*100)}%.`}))}; },
-    apply(tk,res,src){ const leads=res.picks.map(p=>{ const l=tk.data.cands.find(c=>c.id===p.id); l.scout={verdict:'recommend',note:p.note,src}; l.qty=p.qty; return l; });
-      const summary = leads.length ? res.summary : `I checked ${tk.data.checked} products today and none met every requirement, so there's nothing to buy. Biggest reasons: ${Object.entries(tk.data.fails).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>`${k} (${v})`).join(', ')}.`;
-      G.pendingReport={id:G.nid++, leads, summary, src:leads.length?src:'rules', day:G.day, checked:tk.data.checked, fails:tk.data.fails, onDemand:!!tk.onDemand, rexDone:!leads.length, ivyDone:!leads.length}; nextCheck(); }},
+    fallback(tk){ const top=[...tk.data.cands].sort((a,b)=>bestROI(b)-bestROI(a)).slice(0,5);
+      return {summary:'', picks:top.map(l=>({id:l.id, qty:suggestQtyM(l,l.market), note:mktNote(l)}))}; },
+    apply(tk,res,src){ const who=tk.who||'scout', from=(ROLES.find(r=>r.key===who)||{name:'Scout'}).name;
+      const leads=res.picks.map(p=>{ const l=tk.data.cands.find(c=>c.id===p.id); l.scout={verdict:'recommend',note:p.note,src,who:from}; l.qty=p.qty; return l; });
+      const where=tk.source?` on ${tk.source}`:'';
+      const summary = leads.length ? res.summary : `I checked ${tk.data.checked} products${where} and none met the rules on any marketplace, so there's nothing to buy. Biggest reasons on Amazon: ${Object.entries(tk.data.fails).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>`${k} (${v})`).join(', ')}.`;
+      const pr={id:G.nid++, owner:who, from, source:tk.source||null, leads, summary, src:leads.length?src:'rules', day:G.day, checked:tk.data.checked, fails:tk.data.fails, onDemand:!!tk.onDemand, rexDone:!leads.length, ivyDone:!leads.length};
+      (G.pendings=G.pendings||[]).push(pr); nextCheck(pr); }},
   history:{
-    prompt:tk=>{ const pr=G.pendingReport; return `${INTRO('Rex','Product Research')}\nFor each product below you have 12 weeks of history (oldest → newest): the Buy Box price each week and how many FBA sellers were on the listing. Judge whether the price is stable enough for online arbitrage, or whether it looks like a price war / crash is coming that would wipe out the margin (falling prices, sellers piling in, big swings).\n${JSON.stringify(pr.leads.map(l=>({id:l.id,name:l.name,unitCost:l.cost,weeklyBuyBox:l.hist,weeklyFbaSellers:l.offers})))}\nReply with only JSON: {"items":[{"id":number,"stable":true|false,"note":"one sentence citing the trend"}]}`; },
-    parse(tk,ai){ const pr=G.pendingReport; const out={}; for(const i of (ai&&ai.items)||[]){ if(pr.leads.some(l=>l.id===+i.id)) out[+i.id]={stable:!!i.stable, note:S(i.note)}; } if(!Object.keys(out).length) throw 0; return out; },
-    fallback(){ const out={}; for(const l of G.pendingReport.leads){ const d=(l.hist[11]-l.hist[0])/l.hist[0]; out[l.id]={stable:!l.volatile, note:`Price ${d<0?'down':'up'} ${Math.abs(Math.round(d*100))}% over 12 weeks; sellers ${l.offers[0]}→${l.offers[11]}.`}; } return out; },
-    apply(tk,res,src){ const pr=G.pendingReport; for(const l of pr.leads) l.rex={...(res[l.id]||{stable:!l.volatile,note:'No read.'}),src}; pr.rexDone=true; nextCheck(); }},
+    prompt:tk=>{ const pr=PR(tk); return `${INTRO('Rex','Product Research')}\nFor each product below you have 12 weeks of history (oldest → newest): the Buy Box price each week and how many FBA sellers were on the listing. Judge whether the price is stable enough for online arbitrage, or whether it looks like a price war / crash is coming that would wipe out the margin (falling prices, sellers piling in, big swings).\n${JSON.stringify(pr.leads.map(l=>({id:l.id,name:l.name,unitCost:l.cost,weeklyBuyBox:l.hist,weeklyFbaSellers:l.offers})))}\nReply with only JSON: {"items":[{"id":number,"stable":true|false,"note":"one sentence citing the trend"}]}`; },
+    parse(tk,ai){ const pr=PR(tk); const out={}; for(const i of (ai&&ai.items)||[]){ if(pr.leads.some(l=>l.id===+i.id)) out[+i.id]={stable:!!i.stable, note:S(i.note)}; } if(!Object.keys(out).length) throw 0; return out; },
+    fallback(tk){ const out={}; const pr=PR(tk); if(!pr) return out; for(const l of pr.leads){ const d=(l.hist[11]-l.hist[0])/l.hist[0]; out[l.id]={stable:!l.volatile, note:`Price ${d<0?'down':'up'} ${Math.abs(Math.round(d*100))}% over 12 weeks; sellers ${l.offers[0]}→${l.offers[11]}.`}; } return out; },
+    apply(tk,res,src){ const pr=PR(tk); if(!pr) return; for(const l of pr.leads) l.rex={...(res[l.id]||{stable:!l.volatile,note:'No read.'}),src}; pr.rexDone=true; nextCheck(pr); }},
   ip:{
-    prompt:tk=>`${INTRO('Ivy','Compliance')}\nFor each product, judge the risk of an IP complaint (which can freeze our inventory) if we resell it on Amazon.\n${JSON.stringify(G.pendingReport.leads.map(l=>({id:l.id,name:l.name,...l.ipInfo})))}\nReply with only JSON: {"items":[{"id":number,"risk":"low"|"medium"|"high","note":"one sentence"}]}`,
-    parse(tk,ai){ const out={}; for(const i of (ai&&ai.items)||[]){ if(G.pendingReport.leads.some(l=>l.id===+i.id)) out[+i.id]={risk:['low','medium','high'].includes(i.risk)?i.risk:'medium', note:S(i.note)}; } if(!Object.keys(out).length) throw 0; return out; },
-    fallback(){ const out={}; for(const l of G.pendingReport.leads) out[l.id]={risk:l.ip?'high':'low', note:`${l.ipInfo.brand}; ${l.ipInfo.complaintReports} complaint report(s).`}; return out; },
-    apply(tk,res,src){ const pr=G.pendingReport; for(const l of pr.leads){ l.ivy={...(res[l.id]||{risk:'medium',note:'No read.'}),src}; l.ipFail=l.ivy.risk==='high'; } pr.ivyDone=true; nextCheck(); }},
+    prompt:tk=>`${INTRO('Ivy','Compliance')}\nFor each product, judge the risk of an IP complaint (which can freeze our inventory) if we resell it on Amazon.\n${JSON.stringify(PR(tk).leads.map(l=>({id:l.id,name:l.name,...l.ipInfo})))}\nReply with only JSON: {"items":[{"id":number,"risk":"low"|"medium"|"high","note":"one sentence"}]}`,
+    parse(tk,ai){ const out={}; for(const i of (ai&&ai.items)||[]){ if(PR(tk).leads.some(l=>l.id===+i.id)) out[+i.id]={risk:['low','medium','high'].includes(i.risk)?i.risk:'medium', note:S(i.note)}; } if(!Object.keys(out).length) throw 0; return out; },
+    fallback(tk){ const out={}; const pr=PR(tk); if(!pr) return out; for(const l of pr.leads) out[l.id]={risk:l.ip?'high':'low', note:`${l.ipInfo.brand}; ${l.ipInfo.complaintReports} complaint report(s).`}; return out; },
+    apply(tk,res,src){ const pr=PR(tk); if(!pr) return; for(const l of pr.leads){ l.ivy={...(res[l.id]||{risk:'medium',note:'No read.'}),src}; l.ipFail=l.ivy.risk==='high'; } pr.ivyDone=true; nextCheck(pr); }},
   order:{
     prompt:tk=>{ const p=P(tk.ref); return `${INTRO('Stocky','Purchasing & 3PL')}\nRoyce approved this purchase. Write the purchase order and a status line for him. Everything ships from the store to our 3PL first (for the paper trail), then to Amazon FBA.\n${JSON.stringify({product:p.name,store:p.lead.store,units:p.qty,unitCost:p.cost,total:r2(p.qty*p.cost),cashLeftAfter:r2(G.cash),dailyBusinessCosts:dailyCosts().total,otherOpenOrders:G.purchases.filter(x=>['order','to3pl'].includes(x.stage)).length-1})}\nIf cash left is under 5 days of agent costs, add a short warning. Reply with only JSON: {"po":"PO-number you make up","note":"one sentence status","warning":"" }`; },
     parse(tk,ai){ if(!ai||!ai.note) throw 0; return {po:S(ai.po,30)||('PO-'+tk.ref), note:S(ai.note), warning:S(ai.warning)}; },
@@ -572,7 +656,7 @@ const TASKS={
     apply(tk,res,src){ const p=P(tk.ref); if(!p) return; p.boxes=res.boxes; p.prep=res.prep; addNote(p,tk._who||'Lexi',`${res.note} (${res.boxes} box${res.boxes>1?'es':''}: ${res.prep.join('; ')})`,src);
       p.stage='toFBA'; p.t=1.5; log(`🚚 ${p.name} shipped to Amazon FBA`); }},
   reprice:{
-    begin(tk){ tk.data={ids:G.purchases.filter(p=>p.stage==='live').map(p=>p.id)}; },
+    begin(tk){ tk.data={ids:G.purchases.filter(p=>p.stage==='live'&&(p.channel||'amazon')==='amazon').map(p=>p.id)}; },
     prompt:tk=>`${INTRO('Penny','Pricing')}\nSet today's price for each live product. Goal: win the Buy Box and keep selling while staying profitable. Don't race to the bottom; never go below break-even unless stock is stuck. If Amazon itself is on the listing, we rarely win.\n${JSON.stringify(tk.data.ids.map(P).filter(Boolean).map(p=>({id:p.id,name:p.name,ourPrice:p.price,breakEven:r2(breakEven(p)),unitCost:p.cost,competitorOffers:p.comps.map(c=>`${c.type} $${c.price}`),unitsLeft:p.stock,soldYesterday:p.soldYday||0,daysLive:Math.floor(now()-p.liveAt)})))}\nReply with only JSON: {"items":[{"id":number,"price":number,"note":"one short sentence why"}]}`,
     parse(tk,ai){ const out={}; for(const i of (ai&&ai.items)||[]){ const p=P(+i.id); const pr=+i.price; if(p&&pr>0) out[p.id]={price:pr,note:S(i.note)}; } if(!Object.keys(out).length) throw 0; return out; },
     fallback(tk){ const out={}; for(const id of tk.data.ids){ const p=P(id); if(!p) continue; const L=lowComp(p);
@@ -622,7 +706,29 @@ const TASKS={
       log(`🏷️ Eli listed ${L.sellable} items from ${L.name} on eBay`); markSave(); }},
   ebaydaily:{
     parse(){ throw 0; }, fallback(){ return {}; },
-    apply(){ for(const L of G.lots) if(L.stage==='selling'){ L.lastTended=now(); } }},
+    apply(){ for(const L of G.lots) if(L.stage==='selling'){ L.lastTended=now(); } for(const p of G.purchases) if(p.stage==='live'&&p.channel==='ebay') p.lastTended=now(); }},
+  shipwfs:{
+    parse(){ throw 0; }, fallback(){ return {}; },
+    apply(tk){ const p=P(tk.ref); if(!p) return; p.stage='toWFS'; p.t=1.5; addNote(p,tk._who||'Wally',`WFS inbound shipment created for ${p.qty} units.`,'rules'); log(`🚚 ${p.name} shipped to Walmart (WFS)`); }},
+  ebaylist:{
+    parse(){ throw 0; }, fallback(){ return {}; },
+    apply(tk){ const p=P(tk.ref); if(!p) return; p.stage='live'; p.liveAt=now(); p.lastTended=now();
+      addNote(p,tk._who||'Eli',`Listed ${p.stock} units on eBay at ${$$(p.price)}; orders ship from the 3PL.`,'rules'); notify(`✅ ${p.name} is live on eBay!`); markSave(); }},
+  wmdaily:{
+    parse(){ throw 0; }, fallback(){ return {}; },
+    apply(){ for(const p of G.purchases) if(p.stage==='live'&&p.channel==='walmart') p.lastTended=now(); }},
+  movecheck:{
+    parse(){ throw 0; }, fallback(){ return {}; },
+    apply(tk){ const p=P(tk.ref); if(!p||p.stage!=='live'||p.stock<1) return; const m=tk.market, x=(p.markets||{})[m]; if(!x) return;
+      if(G.reports.some(r=>r.type==='move'&&r.pid===p.id&&!r.decision)) return;
+      const who=m==='ebay'?'Eli':'Wally';
+      const amzNet=r2(p.price-(p.price*.15+p.lead.fba)), amzRate=Math.max(tk.rate||0,.05), amzDays=Math.round(p.stock/amzRate);
+      const tNet=r2(x.price-x.fees-(x.ship||0)-MOVE_EST), tRate=Math.max(.05,x.share/30), tDays=Math.round(p.stock/tRate);
+      if(tRate<amzRate*1.5 || tNet<=0){ log(`🔎 ${who} checked ${p.name}: better to keep it on Amazon for now`); return; }
+      const note=`${p.name} is selling about ${r2(amzRate)}/day on Amazon (${amzDays} days to sell ${p.stock}). On ${MKT_LABEL[m]} I estimate ${r2(tRate)}/day (${tDays} days) at ${$$(tNet)} net each after ~${$$(MOVE_EST)}/unit to move it${tNet<amzNet?`. That's less per unit than Amazon (${$$(amzNet)}), but your cash comes back much faster`:', and more per unit than Amazon too'}.`;
+      G.reports.unshift({id:G.nid++, type:'move', from:who, owner:m, read:false, day:G.day, pid:p.id, product:p.name, market:m, units:p.stock,
+        amazon:{price:p.price, net:amzNet, rate:r2(amzRate), days:amzDays}, target:{price:x.price, net:tNet, rate:r2(tRate), days:tDays}, note, decision:null});
+      trimReports(); notify(`🔀 ${who} suggests moving ${p.name} to ${MKT_LABEL[m]}`); markSave(); }},
   wmlist:{
     parse(){ throw 0; }, fallback(){ return {}; },
     apply(tk){ const p=P(tk.ref); if(!p||p.walmart||!['live','done'].includes(p.stage)) return; if(p.stage==='done') return;
@@ -645,32 +751,34 @@ function queueTask(key,task,fallbackKey,slow=1.6){
   a.queue.push(task); updStats();
 }
 function runInstant(task){ const h=TASKS[task.kind]; task._={}; if(h.begin) h.begin(task); h.apply(task,h.fallback(task),'rules'); }
-function nextCheck(){
-  const pr=G.pendingReport; if(!pr) return;
-  if(!pr.rexDone && hiredA('rex')) return queueTask('rex',{kind:'history',title:'Check price history',dur:7});
+function nextCheck(pr){
+  pr=pr||(G.pendings||[])[0]; if(!pr) return;
+  if(!pr.rexDone && hiredA('rex')) return queueTask('rex',{kind:'history',title:'Check price history',dur:7,ref:pr.id});
   pr.rexDone=true;
-  if(!pr.ivyDone && hiredA('ivy')) return queueTask('ivy',{kind:'ip',title:'Check IP risk',dur:7});
+  if(!pr.ivyDone && hiredA('ivy')) return queueTask('ivy',{kind:'ip',title:'Check IP risk',dur:7,ref:pr.id});
   pr.ivyDone=true;
   const passed=pr.leads.length;
   const ipOut=pr.leads.filter(l=>l.ivy&&l.ivy.risk!=='low').length;
   const unstOut=pr.leads.filter(l=>!(l.ivy&&l.ivy.risk!=='low')&&l.rex&&!l.rex.stable).length;
-  pr.leads=pr.leads.filter(l=>!(l.ivy&&l.ivy.risk!=='low') && !(l.rex&&!l.rex.stable)).sort((a,b)=>b.roi-a.roi);
+  pr.leads=pr.leads.filter(l=>!(l.ivy&&l.ivy.risk!=='low') && !(l.rex&&!l.rex.stable)).sort((a,b)=>bestROI(b)-bestROI(a));
   pr.removed={ip:ipOut, unstable:unstOut, rexOn:!!hiredA('rex'), ivyOn:!!hiredA('ivy')};
-  if(passed && !pr.leads.length) pr.summary=`${passed} product${passed>1?'s':''} passed your buy rules, but ${[ipOut?ipOut+' had IP risk (Ivy)':'',unstOut?unstOut+' had unstable prices (Rex)':''].filter(Boolean).join(' and ')}, so I removed them. Nothing to buy this round.`;
-  else if(pr.leads.length) pr.summary=`${pr.leads.length} product${pr.leads.length>1?'s':''} passed every rule${ipOut||unstOut?` after removing ${[ipOut?ipOut+' IP-risky':'',unstOut?unstOut+' price-unstable':''].filter(Boolean).join(' and ')}`:''}. Sorted by highest ROI first.`;
-  G.reports.unshift({...pr, type:'products', from:'Scout', read:false}); trimReports();
-  G.pendingReport=null; G.hunting=false;
-  notify(pr.leads.length?`📋 Scout found ${pr.leads.length} product${pr.leads.length>1?'s':''} that meet your requirements`:`📋 Scout checked ${pr.checked} products: none met your requirements today`);
+  if(passed && !pr.leads.length) pr.summary=`${passed} product${passed>1?'s':''} passed the rules, but ${[ipOut?ipOut+' had IP risk (Ivy)':'',unstOut?unstOut+' had unstable prices (Rex)':''].filter(Boolean).join(' and ')}, so I removed them. Nothing to buy this round.`;
+  else if(pr.leads.length) pr.summary=`${pr.leads.length} product${pr.leads.length>1?'s':''} passed the rules${pr.source?` (found on ${pr.source})`:''}${ipOut||unstOut?` after removing ${[ipOut?ipOut+' IP-risky':'',unstOut?unstOut+' price-unstable':''].filter(Boolean).join(' and ')}`:''}. Each one shows profit and ROI on Amazon, Walmart and eBay. Pick the marketplace before you approve. Highest ROI first.`;
+  G.reports.unshift({...pr, type:'products', from:pr.from||'Scout', read:false}); trimReports();
+  G.pendings=(G.pendings||[]).filter(x=>x!==pr); if(G.pendingReport===pr) G.pendingReport=null;
+  const owner=pr.owner||'scout'; if(owner==='scout') G.hunting=false; else (G.hunts=G.hunts||{})[owner]=false;
+  const nm=pr.from||'Scout';
+  notify(pr.leads.length?`📋 ${nm} found ${pr.leads.length} product${pr.leads.length>1?'s':''} that meet your rules`:`📋 ${nm} checked ${pr.checked} products: none met your rules`);
   if(pr.onDemand) openReportSoon(pr.id);
-  const s=hiredA('scout'); if(s){ s.bubble='Report sent, boss! 📋'; s.bubbleT=2.5; }
+  const s=hiredA(owner); if(s){ s.bubble='Report sent, boss! 📋'; s.bubbleT=2.5; }
   markSave();
 }
-function queueHunt(){ G.hunting=true; G.nextHuntAt=now()+0.5; queueTask('scout',{kind:'hunt',title:'Review today’s product leads',dur:14}); }
+function queueHunt(){ G.hunting=true; G.nextHuntAt=now()+0.5; queueTask('scout',{kind:'hunt',title:'Review today’s product leads',dur:14,who:'scout'}); }
 function queueSupport(){ const h=hiredA('hana'); if(!h) return; if(h.queue.some(t=>t.kind==='support')||(h.task&&h.task.kind==='support')) return;
   queueTask('hana',{kind:'support',title:'Answer buyer messages',dur:6}); }
 function queueReprice(){ const pn=hiredA('penny');
   if(pn && (pn.queue.some(t=>t.kind==='reprice')||(pn.task&&pn.task.kind==='reprice'))) return;
-  if(!G.purchases.some(p=>p.stage==='live')) return;
+  if(!G.purchases.some(p=>p.stage==='live'&&(p.channel||'amazon')==='amazon')) return;
   queueTask('penny',{kind:'reprice',title:'Reprice live products',dur:5}); }
 
 // ---------- liquidation lots ----------
@@ -761,11 +869,13 @@ function askReport(a){
     const cur=a.task&&a.task.kind==='lots', qi=a.queue.findIndex(x=>x.kind==='lots');
     if(cur||qi>=0){ if(qi>0){ const [x]=a.queue.splice(qi,1); a.queue.unshift(x); } (cur?a.task:a.queue[0]).onDemand=true; a.bubble='Already checking lots! 🏗️'; }
     else { G.lotHunting=true; a.queue.unshift({kind:'lots',title:'Check liquidation lots (you asked)',dur:9,onDemand:true}); a.bubble='Checking the auctions now 🏗️'; }
-  } else if(a.key==='scout'){
+  } else if(a.key==='scout'||a.key==='ebay'||a.key==='walmart'){
     const cur=a.task&&a.task.kind==='hunt', qi=a.queue.findIndex(x=>x.kind==='hunt');
+    const pend=(G.pendings||[]).find(x=>(x.owner||'scout')===a.key);
     if(cur||qi>=0){ if(qi>0){ const [x]=a.queue.splice(qi,1); a.queue.unshift(x); } (cur?a.task:a.queue[0]).onDemand=true; a.bubble='Already hunting, boss! 🔍'; }
-    else if(G.pendingReport){ G.pendingReport.onDemand=true; a.bubble='Rex & Ivy are checking my picks now!'; }
-    else { G.hunting=true; a.queue.unshift({kind:'hunt',title:'Product hunt (you asked)',dur:10,onDemand:true}); a.bubble='On it! Checking products now 🔍'; }
+    else if(pend){ pend.onDemand=true; a.bubble='Rex & Ivy are checking my picks now!'; }
+    else if(a.key==='scout'){ G.hunting=true; a.queue.unshift({kind:'hunt',title:'Product hunt (you asked)',dur:10,who:'scout',onDemand:true}); a.bubble='On it! Checking products now 🔍'; }
+    else { queueDealHunt(a.key,true); a.bubble=`Hunting ${a.key==='ebay'?'eBay':'Walmart'} deals now 🔍`; }
   } else {
     if(a.queue.some(x=>x.kind==='brief')||(a.task&&a.task.kind==='brief')){ a.bubble='Working on your report!'; }
     else { a.queue.unshift({kind:'brief',title:'Report for Royce',dur:4,who:a.key}); a.bubble='Report coming up! 📋'; }
@@ -777,12 +887,15 @@ function askReport(a){
 // ---------- buying ----------
 function approve(rep,l,qty){
   const cost=qty*l.cost; if(qty<1||cost>G.cash+1e-6) return;
-  G.cash-=cost; G.total.spent+=cost; l.decision={qty};
+  if(!l.markets) addMarkets(l);
+  const m=l.market||'amazon', mk=l.markets[m];
+  G.cash-=cost; G.total.spent+=cost; l.decision={qty, market:m};
   const p={id:G.nid++, lead:{store:l.store,fba:l.fba,prep:l.prep,sellers:l.sellers,amazon:l.amazon,buyBox:l.buyBox,ourPrice:l.ourPrice,trueMonthly:l.trueMonthly,volatile:l.volatile,ip:l.ip},
-    name:l.name, qty, cost:l.cost, stage:'order', t:0, stock:qty, sold:0, soldYday:0, soldToday:0, revenue:0, net:0, price:l.ourPrice, comps:[], lastRepriced:0,
-    ipAt:l.ip?rr2(.4,2):null, crashAt:l.volatile?rr2(.3,1.5):null, liveAt:0, notes:[]};
+    name:l.name, qty, cost:l.cost, stage:'order', t:0, stock:qty, sold:0, soldYday:0, soldToday:0, soldHist:[], revenue:0, net:0, price:m==='amazon'?l.ourPrice:mk.price, comps:[], lastRepriced:0,
+    channel:m, mk:{...mk}, markets:JSON.parse(JSON.stringify(l.markets)), lastTended:0,
+    ipAt:l.ip?rr2(.4,2):null, crashAt:(l.volatile&&m==='amazon')?rr2(.3,1.5):null, liveAt:0, notes:[]};
   G.purchases.unshift(p);
-  log(`🛒 You approved ${qty}× ${l.name} (${$0(cost)})`);
+  log(`🛒 You approved ${qty}× ${l.name} for ${MKT_LABEL[m]} (${$0(cost)})`);
   queueTask('stocky',{kind:'order',title:'Purchase order: '+l.name,dur:5,ref:p.id});
   markSave(); renderSheet(); updStats();
 }
@@ -818,7 +931,10 @@ function resolveMessage(m,action,reply,src,who){
   log(`💬 ${who} → ${m.product}: ${m.action}`); renderSheetSoon();
 }
 function sale(p,ch){
-  p.stock--; p.sold++; p.soldToday++; if(ch==='walmart') p.walmart.sold++; const fees=p.price*.15+p.lead.fba, net=p.price-fees;
+  p.stock--; p.sold++; p.soldToday++; if(ch==='walmart'&&p.walmart) p.walmart.sold++;
+  const chn=p.channel||'amazon';
+  const fees = (ch==='walmart'||chn==='amazon') ? p.price*.15+p.lead.fba : chn==='walmart' ? p.price*.15+(p.mk.fixed||0) : p.price*.1325+(p.mk.fixed||0);
+  const net=p.price-fees;
   p.revenue+=p.price; p.net+=net; G.pending+=net; G.total.units++; G.total.revenue+=p.price; G.total.net+=net;
   G.today.units++; G.today.revenue+=p.price; G.today.net+=net;
   if(Math.random()<.05){ const m=makeMessage(p);
@@ -829,10 +945,14 @@ function sale(p,ch){
 function simBusiness(dt){
   const dd=dt/DAY; G.time+=dd;
   for(const p of G.purchases){
-    if(p.stage==='to3pl'){ p.t-=dd; if(p.t<=0){ p.stage='at3pl'; log(`🏭 ${p.name} arrived at the 3PL`);
-      queueTask('lexi',{kind:'ship',title:'FBA shipment: '+p.name,dur:6,ref:p.id},'stocky'); markSave(); } }
+    if(p.stage==='to3pl'){ p.t-=dd; if(p.t<=0){ p.stage='at3pl'; log(`🏭 ${p.name} arrived at the 3PL`); queueShip(p); markSave(); } }
+    else if(p.stage==='toWFS'){ p.t-=dd; if(p.t<=0){ p.stage='live'; p.liveAt=now(); p.lastTended=now(); notify(`✅ ${p.name} is live on Walmart!`); markSave(); } }
     else if(p.stage==='toFBA'){ p.t-=dd; if(p.t<=0){ p.stage='live'; p.liveAt=now(); p.lastRepriced=now(); initComps(p);
-      notify(`✅ ${p.name} is live on Amazon!`); queueReprice(); queueWalmart(p); markSave(); } }
+      notify(`✅ ${p.name} is live on Amazon!`); queueReprice(); markSave(); } }
+    else if(p.stage==='live' && (p.channel||'amazon')!=='amazon'){
+      const f=now()-(p.lastTended||0)<=1.5 ? 1 : (p.channel==='ebay'?.3:.5);
+      let exp=(p.mk.trueShare||p.mk.share)*f/30*dd; while(exp>0 && p.stage==='live'){ if(Math.random()<Math.min(1,exp)) sale(p); exp-=1; }
+    }
     else if(p.stage==='live'){
       const age=now()-p.liveAt;
       if(p.crashAt!==null && age>p.crashAt){ p.crashAt=null; for(const c of p.comps) if(c.type!=='FBM') c.price=r2(c.price*rr2(.68,.82));
@@ -846,7 +966,8 @@ function simBusiness(dt){
   simLots(dd);
   if(G.time>=1){ G.time-=1; endOfDay(); }
   if(hiredA('liq') && !G.lotHunting && !G.reports.some(r=>r.type==='lots'&&r.lots.some(l=>!l.decision)) && now()>=(G.nextLotHuntAt||0)){ G.lotHunting=true; G.nextLotHuntAt=now()+1.5; queueTask('liq',{kind:'lots',title:'Check liquidation lots',dur:12}); }
-  if(hiredA('scout') && !G.hunting && G.reports.filter(r=>r.type==='products' && r.leads.some(l=>!l.decision)).length<2 && now()>=(G.nextHuntAt||0)) queueHunt();
+  if(hiredA('scout') && !G.hunting && G.reports.filter(r=>r.type==='products' && (r.owner||'scout')==='scout' && r.leads.some(l=>!l.decision)).length<2 && now()>=(G.nextHuntAt||0)) queueHunt();
+  for(const key of ['ebay','walmart']) if(hiredA(key) && !(G.hunts||{})[key] && !G.reports.some(r=>r.type==='products'&&r.owner===key&&r.leads.some(l=>!l.decision)) && now()>=((G.nextHunt||{})[key]||0)) queueDealHunt(key);
 }
 function endOfDay(){
   const wages=dailyCosts().total; G.cash-=wages; G.total.overhead+=wages;
@@ -855,12 +976,15 @@ function endOfDay(){
     sinceStart:{spentOnInventory:r2(G.total.spent),sales:r2(G.total.revenue),afterFees:r2(G.total.net),agentCosts:r2(G.total.overhead),refunds:r2(G.total.refunds)},
     products:G.purchases.filter(p=>!['done'].includes(p.stage)).slice(0,8).map(p=>({name:p.name,stage:p.stage,price:p.price,left:p.stock,sold:p.sold}))};
   G.today={units:0,revenue:0,net:0,returns:0}; G.day++;
-  for(const p of G.purchases){ p.soldYday=p.soldToday; p.soldToday=0;
+  for(const p of G.purchases){ p.soldYday=p.soldToday; p.soldHist=[...(p.soldHist||[]),p.soldToday].slice(-3); p.soldToday=0;
     if(p.stage==='live'){ for(const c of p.comps) c.price=r2(Math.max(p.cost*1.25,c.price*rr2(.975,1.025)));
       const L=lowComp(p); if(isFinite(L) && p.price<L-.005 && Math.random()<.45){ const c=p.comps.filter(c=>c.type==='FBA').sort((a,b)=>a.price-b.price)[0]; if(c) c.price=r2(Math.max(p.cost*1.2,p.price-rr2(0,.3))); } } }
   if(G.day>=G.nextPayout){ G.nextPayout=G.day+3; if(G.pending!==0){ const amt=G.pending; G.cash+=amt; G.pending=0; notify(`💰 Amazon payout: ${$0(amt)} hit your bank`); } }
   queueReprice();
-  if(G.lots.some(L=>L.stage==='selling')) queueEbayDaily();
+  const liveCh=ch=>G.purchases.some(p=>p.stage==='live'&&(p.channel||'amazon')===ch);
+  if(G.lots.some(L=>L.stage==='selling')||liveCh('ebay')) queueEbayDaily();
+  if(liveCh('walmart')) queueWmDaily();
+  slowMoverChecks();
   queueTask('bea',{kind:'daily',title:`Day ${d.day} money report`,dur:5,data:d});
   markSave();
 }
@@ -942,8 +1066,12 @@ function loadState(json){
   agents=[]; for(const key of G.hired){ const idx=ROLES.findIndex(r=>r.key===key); if(idx>=0) agents.push(makeAgent(idx,(G.queues[key]||[]))); }
   speed=G.speed||1; speedBtn.textContent=speed+'×';
   const anyKind=k=>agents.some(a=>a.queue.some(t=>t.kind===k));
-  if(G.hunting && !anyKind('hunt') && !G.pendingReport) G.hunting=false;
-  if(G.pendingReport && !anyKind('history') && !anyKind('ip')) nextCheck();
+  if(!G.pendings) G.pendings=[]; if(!G.hunts) G.hunts={}; if(!G.nextHunt) G.nextHunt={};
+  if(G.pendingReport){ G.pendingReport.owner=G.pendingReport.owner||'scout'; G.pendingReport.from=G.pendingReport.from||'Scout'; G.pendings.push(G.pendingReport); G.pendingReport=null; }
+  const hasTask=(k,f)=>agents.some(a=>a.queue.some(t=>t.kind===k&&f(t)));
+  if(G.hunting && !hasTask('hunt',t=>!t.who||t.who==='scout') && !G.pendings.some(x=>(x.owner||'scout')==='scout')) G.hunting=false;
+  for(const k of ['ebay','walmart']) if(G.hunts[k] && !hasTask('hunt',t=>t.who===k) && !G.pendings.some(x=>x.owner===k)) G.hunts[k]=false;
+  for(const pr of G.pendings.slice()) if(!hasTask('history',t=>t.ref===pr.id||t.ref==null) && !hasTask('ip',t=>t.ref===pr.id||t.ref==null)) nextCheck(pr);
   if(G.messages.some(m=>!m.done)) queueSupport();
 }
 async function boot(){
@@ -1244,37 +1372,42 @@ setInterval(()=>{ const openDetails=body.querySelector('details[open]') || (docu
 const ck=(v,unknown)=> unknown? '<span class="q">?</span>' : v? '<span class="y">✓</span>':'<span class="n">✗</span>';
 const srcTag=s=>s==='ai'?'<span class="srct ai">🧠 AI</span>':'<span class="srct rl">📏 rules</span>';
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function mktTable(l){
+  return `<div class="mkts">${MKTS.map(m=>{ const x=l.markets[m], sel=(l.decision?(l.decision.market||'amazon'):l.market)===m;
+    return `<button class="mk ${sel?'sel':''} ${x.pass?'':'fail'}" data-a="mkt" data-l="${l.id}" data-m="${m}" ${l.decision?'disabled':''}>
+      <span class="mn">${MKT_ICON[m]} ${MKT_LABEL[m]}${l.best===m?'<i>best</i>':''}</span>
+      <span class="mv"><b>${$$(x.price)}</b><small>sell</small></span>
+      <span class="mv"><b class="${x.profit>0?'g':'r'}">${$$(x.profit)}</b><small>profit</small></span>
+      <span class="mv"><b class="${x.roi>=.25?'g':'r'}">${Math.round(x.roi*100)}%</b><small>ROI</small></span>
+      <span class="mv"><b>~${x.share}</b><small>you/mo</small></span>
+      <span class="mw ${x.pass?'g':'r'}">${x.pass?'✓ meets rules':'✗ '+esc(x.why.join(', '))}</span></button>`; }).join('')}</div>`;
+}
 function leadCard(rep,l){
-  const r=l.rules, sc=l.scout||{verdict:'recommend',note:''};
-  const warn = l.ipFail ? ['bad','⛔ Fails IP rule'] : (l.rex&&!l.rex.stable) ? ['warn','⚠️ Price unstable'] : passesAll(l) ? ['ok','✅ Meets requirements'] : ['bad','Fails requirements'];
-  const dec = l.decision ? (l.decision.skip ? `<div class="dec skip">Skipped</div>` : `<div class="dec buy">✅ Approved ${l.decision.qty} units · ${$0(l.decision.qty*l.cost)}</div>`) : '';
+  if(!l.markets) addMarkets(l);
+  const r=l.rules, sc=l.scout||{note:''}, m=l.market||l.best||'amazon';
+  const warn = l.ipFail ? ['bad','⛔ Fails IP rule'] : (l.rex&&!l.rex.stable) ? ['warn','⚠️ Price unstable'] : passesAny(l) ? ['ok',`✅ Best: ${MKT_LABEL[l.best]}`] : ['bad','Fails rules'];
+  const dec = l.decision ? (l.decision.skip ? `<div class="dec skip">Skipped</div>` : `<div class="dec buy">✅ Approved ${l.decision.qty} units for ${MKT_LABEL[l.decision.market||'amazon']} · ${$0(l.decision.qty*l.cost)}</div>`) : '';
   const afford=maxAfford(l);
   const rex = l.rex ? `<div class="say"><b>Rex:</b> ${l.rex.stable?'✅ Stable.':'⚠️ Unstable.'} ${esc(l.rex.note)} ${srcTag(l.rex.src)}</div>` : '';
   const ivy = l.ivy ? `<div class="say"><b>Ivy:</b> ${l.ivy.risk==='low'?'✅':l.ivy.risk==='medium'?'🟡':'⛔'} ${l.ivy.risk} IP risk. ${esc(l.ivy.note)} ${srcTag(l.ivy.src)}</div>` : '';
   return `<div class="lead ${l.decision?'decided':''}">
     <div class="lh"><b>${l.name}</b><span class="tag ${warn[0]}">${warn[1]}</span></div>
-    <div class="src">Buy at ${l.store} for <b>${$$(l.cost)}</b> → sell on Amazon for <b>${$$(l.ourPrice)}</b> <span class="mut">(Buy Box ${$$(l.buyBox)})</span></div>
-    <div class="grid">
-      <div><span>Profit/unit</span><b class="${l.profit>0?'g':'r'}">${$$(l.profit)}</b></div>
-      <div><span>ROI</span><b class="${l.roi>=.25?'g':'r'}">${Math.round(l.roi*100)}%</b></div>
-      <div><span>Sales rank</span><b>#${l.bsr.toLocaleString()}</b></div>
-      <div><span>Sales (last 3 mo)</span><b class="hist">${(l.salesHist||[l.monthly]).join(' → ')}</b></div>
-      <div><span>FBA sellers</span><b>${l.sellers}</b></div>
-      <div><span>Your share</span><b>~${l.share}/mo</b></div>
-    </div>
+    <div class="src">Buy at <b>${esc(l.store)}</b> for <b>${$$(l.cost)}</b>${l.decision?'':' · <span class="mut">tap a marketplace to choose where it sells</span>'}</div>
+    ${mktTable(l)}
+    <div class="amzline">📦 Amazon: BSR #${l.bsr.toLocaleString()} · sales ${(l.salesHist||[l.monthly]).join(' → ')}/mo · ${l.sellers} FBA sellers · Buy Box ${$$(l.buyBox)}</div>
     <div class="checks">
       <div>${ck(r.bsr)} BSR ≤ 100k</div><div>${ck(r.amazon)} Amazon not selling</div>
       <div>${ck(r.sellers)} 2+ FBA sellers</div><div>${ck(r.price)} ≤ 3% over Buy Box</div>
-      <div>${ck(r.profit)} ROI ≥ 25%</div><div>${ck(r.trend)} Sales steady</div>
-      <div>${ck(l.rex?l.rex.stable:0,!l.rex)} Stable price ${l.rex?'':'<i>(hire Rex)</i>'}</div>
+      <div>${ck(r.trend)} Sales steady</div><div>${ck(l.rex?l.rex.stable:0,!l.rex)} Stable price ${l.rex?'':'<i>(hire Rex)</i>'}</div>
       <div>${ck(l.ivy?l.ivy.risk==='low':0,!l.ivy)} Low IP risk ${l.ivy?'':'<i>(hire Ivy)</i>'}</div>
     </div>
-    <div class="say"><b>Scout:</b> ${esc(sc.note)} ${srcTag(sc.src)}</div>${rex}${ivy}
+    <div class="say"><b>${esc(sc.who||rep.from||'Scout')}:</b> ${esc(sc.note)} ${srcTag(sc.src)}</div>${rex}${ivy}
     ${dec || `<div class="buyrow">
       <div class="step"><button data-a="minus" data-l="${l.id}">−</button><b>${l.qty}</b><button data-a="plus" data-l="${l.id}">+</button></div>
       <div class="cost">${$0(l.qty*l.cost)}<span>max ${afford}</span></div>
       <button class="skipb" data-a="skip" data-l="${l.id}">Skip</button>
-      <button class="buyb" data-a="buy" data-l="${l.id}" ${l.qty<1||l.qty*l.cost>G.cash?'disabled':''}>Approve</button></div>`}
+      <button class="buyb" data-a="buy" data-l="${l.id}" ${l.qty<1||l.qty*l.cost>G.cash?'disabled':''}>Approve · ${MKT_LABEL[m]}</button></div>
+      ${l.markets[m].pass?'':`<div class="say">⚠️ ${MKT_LABEL[m]} doesn't meet your rules for this product (${esc(l.markets[m].why.join(', '))}). You can still choose it.</div>`}`}
   </div>`;
 }
 function lotCard(rep,l){
@@ -1312,6 +1445,15 @@ function lotRow(L){
 }
 function reportView(rep){
   rep.read=true; updStats();
+  if(rep.type==='move'){ const a=rep.amazon, tg=rep.target, M=MKT_LABEL[rep.market];
+    return `<button class="back" data-a="back">‹ All reports</button>
+    <h3>🔀 Move suggestion from ${esc(rep.from)}</h3><p class="mut">Day ${rep.day} · ${esc(rep.product)} · ${rep.units} units on Amazon</p>
+    <div class="say big"><b>${esc(rep.from)}:</b> ${esc(rep.note)}</div>
+    <div class="cmp"><div><b>📦 Stay on Amazon</b><span>Price ${$$(a.price)}</span><span>Net per unit ${$$(a.net)}</span><span>~${a.rate} sold/day</span><span><b>${a.days}</b> days to sell out</span></div>
+      <div class="hl"><b>${MKT_ICON[rep.market]} Move to ${M}</b><span>Price ${$$(tg.price)}</span><span>Net per unit ${$$(tg.net)}</span><span>~${tg.rate} sold/day</span><span><b>${tg.days}</b> days to sell out</span></div></div>
+    <p class="mut">Moving costs ${$$(MOVE_FEE)}/unit for Amazon's removal order (charged now), plus about ${$$(MOVE_EST-MOVE_FEE)}/unit of 3PL handling, already counted in the net above. Units go back to your 3PL, then to ${M}. These are estimates, not guarantees.</p>
+    ${rep.decision?(rep.decision.moved?`<div class="dec buy">🔀 Moved ${rep.decision.moved} units to ${M}</div>`:`<div class="dec skip">Kept on Amazon</div>`)
+      :`<div class="buyrow"><div class="cost">${$0(rep.units*MOVE_FEE)}<span>removal fee</span></div><button class="skipb" data-a="mvskip">Keep on Amazon</button><button class="buyb" data-a="mvgo">Move ${rep.units} units</button></div>`}`; }
   if(rep.type==='lots') return `<button class="back" data-a="back">‹ All reports</button>
     <h3>🏗️ Liquidation report from Sal</h3>
     <p class="mut">Day ${rep.day} · Checked <b>${rep.checked}</b> lots, <b>${rep.lots.length}</b> met every lot rule. Sal never bids without your OK.</p>
@@ -1325,13 +1467,13 @@ function reportView(rep){
     <h3>📋 ${esc(rep.title||'Report')}</h3><p class="mut">Day ${rep.day} · from ${rep.from}, ${rep.role} ${srcTag(rep.src)}</p>
     <div class="say big">${esc(rep.summary)}</div>${rep.bullets&&rep.bullets.length?`<ul class="tips">${rep.bullets.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}`;
   if(rep.type==='products') return `<button class="back" data-a="back">‹ All reports</button>
-    <h3>📋 Product report from Scout</h3>
-    <p class="mut">Day ${rep.day}${rep.checked?` · Checked <b>${rep.checked}</b> products, <b>${rep.leads.length}</b> met every requirement`:''}${rep.leads.some(l=>l.rex)?' · Rex checked price history':''}${rep.leads.some(l=>l.ivy)?' · Ivy checked IP risk':''}. Nothing is bought until you approve. Highest ROI first.</p>
+    <h3>📋 Product report from ${esc(rep.from||'Scout')}</h3>
+    <p class="mut">Day ${rep.day}${rep.checked?` · Checked <b>${rep.checked}</b> products${rep.source?` on ${esc(rep.source)}`:''}, <b>${rep.leads.length}</b> met the rules on at least one marketplace`:''}${rep.leads.some(l=>l.rex)?' · Rex checked price history':''}${rep.leads.some(l=>l.ivy)?' · Ivy checked IP risk':''}. Nothing is bought until you approve. Highest ROI first.</p>
     ${rep.removed&&(rep.removed.ip||rep.removed.unstable)?`<div class="say">🧹 Screened out: ${rep.removed.ip?`<b>${rep.removed.ip}</b> IP-risky (Ivy)`:''}${rep.removed.ip&&rep.removed.unstable?' · ':''}${rep.removed.unstable?`<b>${rep.removed.unstable}</b> price-unstable (Rex)`:''}</div>`:''}
     ${rep.removed&&(!rep.removed.rexOn||!rep.removed.ivyOn)?`<div class="say">⚠️ ${!rep.removed.rexOn&&!rep.removed.ivyOn?'Hire <b>Rex</b> and <b>Ivy</b>':!rep.removed.rexOn?'Hire <b>Rex</b>':'Hire <b>Ivy</b>'} in the Team tab so unstable-price and IP-risky products get removed automatically.</div>`:''}
     <details class="reqs"><summary>Your requirements (checked by code, not guesses)</summary><ul>
       <li>BSR 100,000 or better</li><li>Amazon not selling on the listing</li><li>At least 2 FBA sellers</li><li>Your price ≤ 3% over the Buy Box</li><li>ROI 25% or more</li>
-      <li>Sales history steady (last month ≥ 70% of 3-month average)</li><li>No IP problems (Ivy)</li><li>Quantity ≈ 1 month of your share (last month's sales ÷ (FBA sellers + 1)), max 35% of cash</li></ul>
+      <li>Sales history steady (last month ≥ 70% of 3-month average)</li><li>No IP problems (Ivy)</li><li><b>Walmart:</b> ROI ≥ 25% after 15% fee + WFS fee, Walmart itself not selling it, 30+ sales/mo</li><li><b>eBay:</b> ROI ≥ 25% after 13.25% fee + shipping, 15+ sold/mo, sell-through ≥ 40%</li><li>A product shows up if it meets the rules on <b>at least one</b> marketplace</li><li>Quantity ≈ 1 month of your share (last month's sales ÷ (FBA sellers + 1)), max 35% of cash</li></ul>
       ${rep.fails?`<p class="mut">Rejected today: ${Object.entries(rep.fails).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${esc(k)} (${v})`).join(' · ')}</p>`:''}</details>
     ${rep.summary?`<div class="say big"><b>Scout:</b> ${esc(rep.summary)} ${srcTag(rep.src)}</div>`:''}
     ${rep.leads.map(l=>leadCard(rep,l)).join('')}`;
@@ -1387,24 +1529,25 @@ function renderSheet(){
   if(tab==='reports'){
     if(openRep){ const rep=G.reports.find(r=>r.id===openRep); h=rep?reportView(rep):''; }
     if(!h){ openRep=null;
-      if(G.pendingReport) h+=`<div class="ritem pending"><div><b>⏳ Product report in progress</b><span class="mut">${!G.pendingReport.rexDone?'Rex is checking price history':'Ivy is checking IP risk'}…</span></div></div>`;
+      for(const pr of (G.pendings||[])) h+=`<div class="ritem pending"><div><b>⏳ ${esc(pr.from||'Scout')}'s report in progress</b><span class="mut">${!pr.rexDone?'Rex is checking price history':'Ivy is checking IP risk'}…</span></div></div>`;
       h += G.reports.length ? G.reports.map(r=>{
         const pend = r.type==='products' ? r.leads.filter(l=>!l.decision).length : 0;
         return `<div class="ritem" data-a="open" data-r="${r.id}">${r.read?'':'<i class="dot"></i>'}
-          <div><b>${r.type==='lots'?`🏗️ Liquidation report · ${r.lots.length} lot${r.lots.length===1?'':'s'}`:r.type==='products'?`📋 Product report · ${r.leads.length} match${r.leads.length===1?'':'es'}`:r.type==='brief'?`🗂️ ${esc(r.from)}: ${esc(r.title||'Report')}`:'📊 '+esc(r.headline||('Day '+r.d.day+' money report'))}</b>
-          <span class="mut">from ${r.from}${r.type==='lots'?` · Day ${r.day} · ${!r.lots.length?'nothing passed':r.lots.some(l=>!l.decision)?r.lots.filter(l=>!l.decision).length+' waiting on you':'all decided'}`:r.type==='products'?` · Day ${r.day} · ${!r.leads.length?'nothing passed':pend?pend+' waiting on you':'all decided'}`:` · Day ${r.type==='brief'?r.day:r.d.day}`}</span></div><span class="chev">›</span></div>`; }).join('')
-        : (G.pendingReport?'':`<p class="mut center">No reports yet. Scout is reviewing today’s leads. Check back soon, or tap Scout if they're slacking! 🔍</p>`);
+          <div><b>${r.type==='lots'?`🏗️ Liquidation report · ${r.lots.length} lot${r.lots.length===1?'':'s'}`:r.type==='move'?`🔀 Move ${esc(r.product)} → ${MKT_LABEL[r.market]}`:r.type==='products'?`📋 ${r.from&&r.from!=='Scout'?esc(r.from)+"'s deals":'Product report'} · ${r.leads.length} match${r.leads.length===1?'':'es'}`:r.type==='brief'?`🗂️ ${esc(r.from)}: ${esc(r.title||'Report')}`:'📊 '+esc(r.headline||('Day '+r.d.day+' money report'))}</b>
+          <span class="mut">from ${r.from}${r.type==='lots'?` · Day ${r.day} · ${!r.lots.length?'nothing passed':r.lots.some(l=>!l.decision)?r.lots.filter(l=>!l.decision).length+' waiting on you':'all decided'}`:r.type==='products'?` · Day ${r.day} · ${!r.leads.length?'nothing passed':pend?pend+' waiting on you':'all decided'}`:r.type==='move'?` · Day ${r.day} · ${r.decision?'decided':'waiting on you'}`:` · Day ${r.d?r.d.day:r.day}`}</span></div><span class="chev">›</span></div>`; }).join('')
+        : ((G.pendings||[]).length?'':`<p class="mut center">No reports yet. Scout is reviewing today’s leads. Check back soon, or tap Scout if they're slacking! 🔍</p>`);
     }
   } else if(tab==='ai'){ h=aiView();
   } else if(tab==='products'){
-    const label={order:'Waiting for Stocky to order',to3pl:'In transit to 3PL',at3pl:'At 3PL: needs FBA shipment',toFBA:'In transit to Amazon',live:'Live & selling',done:'Sold out',suppressed:'Suppressed (IP complaint)'};
-    const pct={order:.05,to3pl:.25,at3pl:.45,toFBA:.65,live:.85,done:1,suppressed:1};
+    const label={order:'Waiting for Stocky to order',to3pl:'In transit to 3PL',at3pl:'At 3PL: needs a shipment / listing',toFBA:'In transit to Amazon (FBA)',toWFS:'In transit to Walmart (WFS)',live:'Live & selling',done:'Sold out',suppressed:'Suppressed (IP complaint)',moved:'Moved to another marketplace'};
+    const pct={order:.05,to3pl:.25,at3pl:.45,toFBA:.65,toWFS:.65,live:.85,done:1,suppressed:1,moved:1};
     h = G.purchases.length ? G.purchases.map(p=>{
       const invested=p.qty*(p.cost+p.lead.prep), profit=p.net-invested;
       const L=p.comps&&p.comps.length?lowComp(p):Infinity;
-      const extra = p.stage==='to3pl'||p.stage==='toFBA' ? ` · ~${Math.max(0,p.t).toFixed(1)} days` : p.stage==='live' ? ` · ${$$(p.price)} <span class="mut">(lowest offer ${isFinite(L)?$$(L):'none'})</span>` : '';
-      return `<div class="prod"><div class="lh"><b>${p.name}</b><span class="mut">${p.qty} units</span></div>
-        <div class="stage ${p.stage}">${label[p.stage]}${extra}</div>
+      const ch=p.channel||'amazon';
+      const extra = ['to3pl','toFBA','toWFS'].includes(p.stage) ? ` · ~${Math.max(0,p.t).toFixed(1)} days` : p.stage==='live' ? (ch==='amazon'?` · ${$$(p.price)} <span class="mut">(lowest offer ${isFinite(L)?$$(L):'none'})</span>`:` · ${$$(p.price)}${now()-(p.lastTended||0)>1.5?` <span class="r">${ch==='ebay'?'Eli':'Wally'} needs to tend listings</span>`:''}`) : '';
+      return `<div class="prod"><div class="lh"><b>${p.name}</b><span class="mut nowrap">${MKT_ICON[ch]} ${MKT_LABEL[ch]} · ${p.qty} units</span></div>
+        <div class="stage ${p.stage}">${p.stage==='live'?`Live on ${MKT_LABEL[ch]}`:label[p.stage]}${extra}</div>
         <div class="pbar"><i style="width:${pct[p.stage]*100}%" class="${p.stage}"></i></div>${p.walmart?`<div class="wm">🟦 Also on Walmart · ${p.walmart.sold} sold there</div>`:''}
         <div class="pr"><span>Sold <b>${p.sold}</b> · Left <b>${p.stock}</b></span><span>${profit>=0?`Profit <b class="g">${$0(profit)}</b>`:`Earned back <b>${$0(p.net)}</b> of ${$0(invested)}`}</span></div>
         ${(p.notes||[]).slice(0,3).map(n=>`<div class="note"><b>${n.who}:</b> ${esc(n.text)} ${srcTag(n.src)}</div>`).join('')}</div>`; }).join('')
@@ -1437,7 +1580,6 @@ body.addEventListener('click',e=>{
   if(act==='back'){ openRep=null; renderSheet(); return; }
   if(act==='hire'){ const r=ROLES[+b.dataset.i]; if(G.cash<r.hire) return; G.cash-=r.hire; G.total.overhead+=r.hire;
     agents.push(makeAgent(+b.dataset.i)); notify(`👋 You hired ${r.name} (${r.role})`);
-    if(r.key==='walmart') G.purchases.filter(p=>p.stage==='live').forEach(queueWalmart);
     if(r.key==='ebay'){ G.lots.filter(L=>L.stage==='arrived').forEach(L=>queueTask('ebay',{kind:'listlot',title:'List lot on eBay: '+L.name,dur:8,ref:L.id})); }
     markSave(); renderSheet(); return; }
   if(act==='ai'){ toggleAI(); return; }
@@ -1449,7 +1591,9 @@ body.addEventListener('click',e=>{
   const rep=G.reports.find(r=>r.id===openRep); if(!rep) return;
   if(act==='lotbuy'||act==='lotskip'){ const lt=rep.lots.find(x=>x.id===+b.dataset.l); if(!lt||lt.decision) return; const y=body.scrollTop;
     if(act==='lotbuy') approveLot(rep,lt); else { lt.decision={skip:true}; markSave(); } renderSheet(); body.scrollTop=y; return; }
+  if(act==='mvgo'||act==='mvskip'){ if(rep.type!=='move'||rep.decision) return; const y=body.scrollTop; if(act==='mvgo') approveMove(rep); else { rep.decision={skip:true}; markSave(); } renderSheet(); body.scrollTop=y; return; }
   if(!rep.leads) return; const l=rep.leads.find(x=>x.id===+b.dataset.l); if(!l||l.decision) return;
+  if(act==='mkt'){ l.market=b.dataset.m; l.qty=suggestQtyM(l,l.market); }
   const afford=Math.floor(Math.max(0,G.cash)/l.cost);
   if(act==='minus'){ l.qty=Math.max(0,l.qty-(l.qty>20?5:1)); }
   if(act==='plus'){ l.qty=Math.min(afford,l.qty+(l.qty>=20?5:1)); }
@@ -1476,7 +1620,7 @@ async function toggleAI(){
 // ================= start =================
 const appEl=document.getElementById('app'); appEl.addEventListener('scroll',()=>{appEl.scrollTop=0;appEl.scrollLeft=0;}); window.addEventListener('scroll',()=>window.scrollTo(0,0));
 resize(); updStats(); boot();
-window.__ggn={pos:()=>agents.map(a=>({key:a.key,state:a.state,x:offX+a.hx*scale,y:offY+(a.hy+30)*scale})), leads:()=>G.reports.filter(r=>r.type==='products').map(r=>r.leads.map(l=>({pass:passesAll(l),roi:l.roi,ivy:l.ivy&&l.ivy.risk,rex:l.rex&&l.rex.stable}))), removed:()=>G.reports.filter(r=>r.type==='products').map(r=>r.removed)};
+window.__ggn={ purchases:()=>G.purchases.map(p=>({name:p.name,ch:p.channel,stage:p.stage,sold:p.sold,stock:p.stock})), reports:()=>G.reports.map(r=>({type:r.type,from:r.from,n:(r.leads||r.lots||[]).length})), pos:()=>agents.map(a=>({key:a.key,state:a.state,x:offX+a.hx*scale,y:offY+(a.hy+30)*scale})), leads:()=>G.reports.filter(r=>r.type==='products').map(r=>r.leads.map(l=>({from:r.from,pass:passesAny(l),best:l.best,market:l.market,roi:l.roi,ivy:l.ivy&&l.ivy.risk,rex:l.rex&&l.rex.stable}))), removed:()=>G.reports.filter(r=>r.type==='products').map(r=>r.removed)};
 let last=performance.now();
 function loop(nowT){ const dt=Math.min(.05,(nowT-last)/1000); last=nowT; step(dt); render(); updClock(); requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
