@@ -24,7 +24,14 @@ h1 small{display:block;font-size:9.5px;font-weight:700;color:#8a7f66;letter-spac
 .clock{text-align:right}
 .clock b{font-size:17px;font-variant-numeric:tabular-nums;display:block;line-height:1.05}
 .clock span{font-size:8.5px;font-weight:800;letter-spacing:.8px;color:#8a7f66;white-space:nowrap}
-#speedBtn{background:#2a2620;color:#fff;border-radius:9px;padding:7px 9px;font-size:13px}
+#speedBtn,#setBtn{background:#2a2620;color:#fff;border-radius:9px;padding:7px 9px;font-size:13px}
+#setBtn{padding:7px 8px}
+.setcard{background:#fff;border:1px solid #eadfc6;border-radius:14px;padding:12px;margin:0 0 10px;display:flex;flex-direction:column;gap:10px}
+.setrow{display:flex;align-items:center;gap:10px}.setrow>span{flex:1;display:flex;flex-direction:column;gap:2px}.setrow>span i{font-style:normal;color:#8a7f66;font-size:12px}
+.tog{width:52px;height:30px;border-radius:15px;background:#d9cfb6;position:relative;padding:0;flex:none;transition:background .2s}.tog::after{content:'';position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .2s}.tog.on{background:#1f9d5c}.tog.on::after{left:25px}
+.vol{display:flex;align-items:center;gap:10px}.vol input{flex:1;accent-color:#1f9d5c;height:28px}.vol b{width:40px;text-align:right}
+.vol.off{opacity:.45}
+.trk{display:flex;gap:6px;flex-wrap:wrap}.trk button{flex:1;min-width:30%;background:#f4eedf;color:#2a2620;padding:8px 6px;font-size:12px;border:1px solid #eadfc6}.trk button.on{background:#2a2620;color:#fff;border-color:#2a2620}
 .stats{display:flex;gap:5px;margin-top:7px}
 .stat{flex:1;background:#fbf6e9;border:1px solid #e0d3b2;border-radius:9px;padding:4px 4px;text-align:center}
 .stat b{font-size:14px;display:block;font-variant-numeric:tabular-nums}
@@ -176,7 +183,7 @@ html,body{overscroll-behavior:none;-webkit-user-select:none;user-select:none;-we
   <header>
     <div class="top">
       <h1><small>Pretend money · rules mode<button id="aiChip" style="display:none"></button></small>Global General Needs</h1>
-      <div class="clockbox"><div class="clock"><b id="clk">9:00 AM</b><span id="clkLbl">DAY 1</span></div><button id="speedBtn">1×</button></div>
+      <div class="clockbox"><div class="clock"><b id="clk">9:00 AM</b><span id="clkLbl">DAY 1</span></div><button id="speedBtn">1×</button><button id="setBtn" aria-label="Settings">⚙️</button></div>
     </div>
     <div class="stats">
       <div class="stat"><b id="sCash">$1,000</b><span>Cash</span></div>
@@ -200,7 +207,7 @@ html,body{overscroll-behavior:none;-webkit-user-select:none;user-select:none;-we
     </div>
   </footer>
   <div id="sheet">
-    <div class="sh"><div class="tabs"><button data-t="reports">📋 Reports</button><button data-t="products">📦 Stock</button><button data-t="team">👥 Team</button></div><button id="sheetClose">✕</button></div>
+    <div class="sh"><div class="tabs"><button data-t="reports">📋 Reports</button><button data-t="products">📦 Stock</button><button data-t="team">👥 Team</button><button data-t="settings">⚙️</button></div><button id="sheetClose">✕</button></div>
     <div id="sheetBody"></div>
   </div>
 </div>
@@ -1519,10 +1526,74 @@ function openSheet(which){ tab=which; sheetOpen=true; sheet.classList.add('open'
 function closeSheet(){ sheetOpen=false; sheet.classList.remove('open'); openRep=null; }
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>openSheet(b.dataset.t));
 sheetClose.onclick=closeSheet;
+/* ---------- calm background music (made live in the browser, no audio files) ---------- */
+const PREF_KEY='ggn-office-prefs-v1';
+const PREFS=(()=>{ let p={}; try{ p=JSON.parse(localStorage.getItem(PREF_KEY)||'{}')||{}; }catch(e){} return Object.assign({music:true, vol:40, style:'lofi'}, p); })();
+function savePrefs(){ try{ localStorage.setItem(PREF_KEY, JSON.stringify(PREFS)); }catch(e){} }
+const STYLES={ lofi:{name:'☕ Lo-fi', bpm:72}, rain:{name:'🌧️ Rainy', bpm:60}, island:{name:'🌺 Island', bpm:84} };
+const Music=(()=>{
+  let ctx=null, master=null, bus=null, wet=null, timer=null, step=0, nextT=0, rainSrc=null;
+  // chord roots as MIDI, with 7th-chord voicings
+  const PROG={ lofi:[[57,60,64,67],[53,57,60,64],[50,53,57,60],[55,59,62,65]],     // Am7 Fmaj7 Dm7 G7
+               rain:[[52,55,59,62],[48,52,55,59],[45,48,52,55],[47,50,54,57]],     // Em7 Cmaj7 Am7 Bm7
+               island:[[48,52,55,57],[53,57,60,62],[45,48,52,55],[55,59,62,64]] }; // C6 F6 Am7 G6
+  const SCALE={ lofi:[69,72,74,76,79,81], rain:[64,67,69,71,74,76], island:[72,74,76,79,81,84] };
+  const hz=m=>440*Math.pow(2,(m-69)/12);
+  function build(){
+    const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return false;
+    ctx=new AC(); master=ctx.createGain(); master.gain.value=0; master.connect(ctx.destination);
+    const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1800; lp.Q.value=.3; lp.connect(master);
+    bus=ctx.createGain(); bus.gain.value=1; bus.connect(lp);
+    // soft echo "room"
+    const d=ctx.createDelay(1.5); d.delayTime.value=.42; const fb=ctx.createGain(); fb.gain.value=.38; const df=ctx.createBiquadFilter(); df.type='lowpass'; df.frequency.value=1200;
+    wet=ctx.createGain(); wet.gain.value=.35; bus.connect(wet); wet.connect(d); d.connect(df); df.connect(fb); fb.connect(d); df.connect(lp);
+    return true; }
+  function tone(m,t,dur,type,peak,att){ const o=ctx.createOscillator(), g=ctx.createGain(); o.type=type; o.frequency.value=hz(m); o.detune.value=(Math.random()-.5)*8;
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(peak,t+att); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    o.connect(g); g.connect(bus); o.start(t); o.stop(t+dur+.05); }
+  function rain(on){ if(on&&!rainSrc){ const n=ctx.sampleRate*2, b=ctx.createBuffer(1,n,ctx.sampleRate), x=b.getChannelData(0); let last=0; for(let i=0;i<n;i++){ last=(last+.02*(Math.random()*2-1))/1.02; x[i]=last*3.5; }
+      rainSrc=ctx.createBufferSource(); rainSrc.buffer=b; rainSrc.loop=true; const f=ctx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=900; f.Q.value=.5; const g=ctx.createGain(); g.gain.value=.22;
+      rainSrc.connect(f); f.connect(g); g.connect(master); rainSrc.start(); }
+    if(!on&&rainSrc){ try{rainSrc.stop();}catch(e){} rainSrc=null; } }
+  function schedule(){
+    const st=PREFS.style in PROG?PREFS.style:'lofi', beat=60/STYLES[st].bpm;
+    while(nextT<ctx.currentTime+1.2){
+      const bar=Math.floor(step/8), half=step%8, ch=PROG[st][bar%4], t=nextT;
+      if(half===0){ ch.forEach((m,i)=>tone(m,t+i*.03,beat*8.5,'sine',.055,.9)); tone(ch[0]-12,t,beat*7,'triangle',.07,.08); }   // pad + soft bass
+      if(half===4) tone(ch[0]-12+7,t,beat*3.5,'triangle',.045,.08);
+      if(st==='island'&&(half===2||half===6)) ch.slice(1).forEach((m,i)=>tone(m+12,t+i*.04,beat*1.2,'triangle',.022,.01)); // ukulele-ish strum
+      const sc=SCALE[st]; if(Math.random()<(st==='rain'?.28:.38)) tone(sc[Math.floor(Math.random()*sc.length)],t+(Math.random()<.3?beat/2:0),beat*2.5,'sine',.05,.02); // gentle melody
+      step++; nextT+=beat; }
+  }
+  const level=()=>Math.pow(PREFS.vol/100,1.6)*.9;
+  return {
+    start(){ if(!PREFS.music) return; if(!ctx&&!build()) return; if(ctx.state!=='running') ctx.resume();
+      if(!timer){ nextT=ctx.currentTime+.15; step=0; schedule(); timer=setInterval(schedule,250); }
+      rain(PREFS.style==='rain'); master.gain.cancelScheduledValues(ctx.currentTime); master.gain.setTargetAtTime(level(),ctx.currentTime,.6); },
+    stop(){ if(!ctx) return; master.gain.cancelScheduledValues(ctx.currentTime); master.gain.setTargetAtTime(0,ctx.currentTime,.25);
+      clearInterval(timer); timer=null; setTimeout(()=>{ if(!timer&&ctx) { rain(false); ctx.suspend(); } },900); },
+    volume(){ if(ctx&&timer) master.gain.setTargetAtTime(level(),ctx.currentTime,.15); },
+    restyle(){ if(ctx&&timer){ rain(PREFS.style==='rain'); } },
+    get playing(){ return !!timer; } };
+})();
+// phones only allow sound after a tap, so music starts on your first touch
+const kickMusic=()=>{ if(PREFS.music&&!document.hidden) Music.start(); };
+['pointerdown','touchend','keydown'].forEach(ev=>document.addEventListener(ev,kickMusic,{passive:true}));
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) Music.stop(); else if(PREFS.music&&Music.wasOn) kickMusic(); });
+Object.defineProperty(Music,'wasOn',{get:()=>PREFS.music});
+function settingsView(){
+  return `<div class="setcard"><div class="setrow"><span><b>🎵 Background music</b><i>Calm music made live by the game. It plays after your first tap.</i></span>
+      <button class="tog ${PREFS.music?'on':''}" data-a="music" aria-label="Music on or off"></button></div>
+    <div class="vol ${PREFS.music?'':'off'}"><span>🔈</span><input id="volIn" type="range" min="0" max="100" step="1" value="${PREFS.vol}" ${PREFS.music?'':'disabled'}><span>🔊</span><b id="volLbl">${PREFS.vol}%</b></div>
+    <div class="trk">${Object.entries(STYLES).map(([k,v])=>`<button data-a="mstyle" data-s="${k}" class="${PREFS.style===k?'on':''}" ${PREFS.music?'':'disabled'}>${v.name}</button>`).join('')}</div>
+    <span class="mut">On iPhone, the ring/silent switch can mute it. Flip it to ring if you hear nothing.</span></div>`;
+}
+document.addEventListener('input',e=>{ if(e.target&&e.target.id==='volIn'){ PREFS.vol=+e.target.value; const l=document.getElementById('volLbl'); if(l) l.textContent=PREFS.vol+'%'; Music.volume(); savePrefs(); } });
+setBtn.onclick=()=>openSheet('settings');
 navRep.onclick=()=>openSheet('reports'); navProd.onclick=()=>openSheet('products'); navTeam.onclick=()=>openSheet('team'); navAI.onclick=()=>openSheet('ai');
 function renderSheetSoon(){ dirty=true; }
 setInterval(()=>{ const openDetails=body.querySelector('details[open]') || (document.activeElement&&document.activeElement.tagName==='INPUT'&&body.contains(document.activeElement));
-  if(sheetOpen && !openDetails && (dirty || tab==='products' || (tab==='ai' && aiLog.some(e=>e.status==='thinking'||e.status==='waiting')))){ dirty=false; const y=body.scrollTop; renderSheet(); body.scrollTop=y; }
+  if(sheetOpen && !openDetails && tab!=='settings' && (dirty || tab==='products' || (tab==='ai' && aiLog.some(e=>e.status==='thinking'||e.status==='waiting')))){ dirty=false; const y=body.scrollTop; renderSheet(); body.scrollTop=y; }
   else if(dirty && !sheetOpen) dirty=false; updStats(); },800);
 
 const ck=(v,unknown)=> unknown? '<span class="q">?</span>' : v? '<span class="y">✓</span>':'<span class="n">✗</span>';
@@ -1719,6 +1790,7 @@ function renderSheet(){
           <span class="mut">from ${r.from}${r.type==='lots'?` · Day ${r.day} · ${!r.lots.length?'nothing passed':r.lots.some(l=>!l.decision)?r.lots.filter(l=>!l.decision).length+' waiting on you':'all decided'}`:r.type==='products'?` · Day ${r.day} · ${!r.leads.length&&!(r.moves||[]).length?'nothing passed':pend?pend+' waiting on you':'all decided'}`:r.type==='move'?` · Day ${r.day} · ${r.decision?'decided':'waiting on you'}`:` · Day ${r.d?r.d.day:r.day}`}</span></div><span class="chev">›</span></div>`; }).join('')
         : ((G.pendings||[]).length?'':`<p class="mut center">No reports yet. Scout is reviewing today’s leads. Check back soon, or tap Scout if they're slacking! 🔍</p>`);
     }
+  } else if(tab==='settings'){ h=settingsView();
   } else if(tab==='ai'){ h=aiView();
   } else if(tab==='products'){
     const label={order:'Waiting for Stocky to order',to3pl:'In transit to 3PL',at3pl:'At 3PL: needs a shipment / listing',toFBA:'In transit to Amazon (FBA)',toWFS:'In transit to Walmart (WFS)',live:'Live & selling',done:'Sold out',suppressed:'Suppressed (IP complaint)',moved:'Moved to another marketplace'};
@@ -1771,6 +1843,8 @@ body.addEventListener('click',e=>{
   if(act==='newgo'){ const v=Math.round(parseFloat(String(budgetDraft).replace(/[^0-9.]/g,''))||0);
     if(v<100||v>1000000){ const e=document.getElementById('budgetErr'); if(e) e.textContent='Enter an amount between $100 and $1,000,000.'; return; }
     confirmNew=false; newGame(v); return; }
+  if(act==='music'){ PREFS.music=!PREFS.music; savePrefs(); if(PREFS.music) Music.start(); else Music.stop(); renderSheet(); return; }
+  if(act==='mstyle'){ PREFS.style=b.dataset.s; savePrefs(); Music.restyle(); renderSheet(); return; }
   if(act==='readall'){ G.reports.forEach(r=>r.read=true); updStats(); renderSheet(); return; }
   if(act==='clearrep'){ const dailies=G.reports.filter(r=>r.type==='daily').slice(0,1);
     const open=r=> r.type==='products'?(r.leads.some(l=>!l.decision)||(r.moves||[]).some(v=>!v.decision)) : r.type==='lots'?r.lots.some(l=>!l.decision) : r.type==='move'?!r.decision : r.type==='daily'?dailies.includes(r) : !r.read;

@@ -1,7 +1,7 @@
 // GGN Office offline support.
 // The game page loads fresh from the internet when online (so updates show up right away),
 // and falls back to the saved copy when offline. Icons etc. come from the saved copy.
-const CACHE = 'ggn-office-v3';
+const CACHE = 'ggn-office-v4';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener('activate', e => {
