@@ -740,8 +740,8 @@ function sendDigest(owner,onDemand){
 function sendAllDigests(){ for(const owner of Object.keys(G.digest||{})) sendDigest(owner,false); }
 
 // ---------- freshness: hot-deal alerts, re-checks, deal age ----------
-const HOT={roi:1.0, profit:20, perDay:1, teamPerDay:2};   // practice thresholds: ROI above 100% and profit ≥ $20/unit (or a watchlist price drop); max 1 per bot, 2 per day overall
-const isHot=l=>{ const x=l.best&&l.markets?l.markets[l.best]:null; return !!x && (l.watchHit || (x.roi>HOT.roi && x.profit>=HOT.profit)); };
+const HOT={roi:1.5, profit:20, perDay:1, teamPerDay:2};   // practice thresholds: ROI of 150%+ and profit ≥ $20/unit (or a watchlist price drop); max 1 per bot, 2 per day overall
+const isHot=l=>{ const x=l.best&&l.markets?l.markets[l.best]:null; return !!x && x.roi>=HOT.roi && x.profit>=HOT.profit; };
 function hotAllowed(owner){ const H=G.hot=G.hot||{}; const h=H[owner]; const team=Object.values(H).filter(x=>x&&x.day===G.day).reduce((a,x)=>a+x.n,0); return team<HOT.teamPerDay && (!h||h.day!==G.day||h.n<HOT.perDay); }
 function sendHot(owner,l){ const H=G.hot=G.hot||{}; if(!H[owner]||H[owner].day!==G.day) H[owner]={day:G.day,n:0}; H[owner].n++;
   const nm=(ROLES.find(r=>r.key===owner)||{name:'Scout'}).name;
@@ -895,7 +895,7 @@ const TASKS={
         w.lead.cost=r2(w.lead.cost*(Math.random()<.1?rr2(.85,.95):rr2(.98,1.03)));
         if(w.lead.cost<=w.target){ const l=freshLead(w.lead); recalcLead(l);
           if(passesAny(l)){ W.splice(W.indexOf(w),1); l.scout={verdict:'recommend',src:'rules',who:'Scout',note:`Fell to ${$$(l.cost)} at ${l.store} (was ${$$(w.was)}, target ${$$(w.target)}). Now best on ${MKT_LABEL[l.best]} at ${Math.round(l.markets[l.best].roi*100)}% ROI.`}; l.qty=suggestQtyM(l,l.market); hits.push(l); } } }
-      if(hits.length){ hits.forEach(l=>l.watchHit=true); const hotNow=hits.filter((l,i)=>i<1&&hotAllowed('scout')); hotNow.forEach(l=>sendHot('scout',l)); digestAdd('scout',hits.filter(l=>!hotNow.includes(l))); log(`👀 ${hits.length} watched product${hits.length>1?'s':''} dropped in price (added to Scout's report)`); }
+      if(hits.length){ hits.forEach(l=>l.watchHit=true); const hotNow=hits.filter(l=>isHot(l)&&hotAllowed('scout')).slice(0,1); hotNow.forEach(l=>sendHot('scout',l)); digestAdd('scout',hits.filter(l=>!hotNow.includes(l))); log(`👀 ${hits.length} watched product${hits.length>1?'s':''} dropped in price (added to Scout's report)`); }
       markSave(); }},
   wmlist:{
     parse(){ throw 0; }, fallback(){ return {}; },
