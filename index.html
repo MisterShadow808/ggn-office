@@ -135,6 +135,11 @@ pre{white-space:pre-wrap;word-break:break-word;background:#f6f1e4;border-radius:
 .crow{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;align-items:baseline}
 .crow span{display:flex;flex-direction:column} .crow i{font-style:normal;font-size:10.5px;color:#8a7f66}
 .crow.tot{border-top:1px solid #eadfc6;padding-top:6px;margin-top:2px;font-weight:800}
+.newcard{background:#fff7e3;border:2px solid #e8c33a;border-radius:14px;padding:12px;margin-top:12px;display:flex;flex-direction:column;gap:8px;font-size:12.5px}
+.budget{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #e0d3b2;border-radius:10px;padding:8px 10px;font-weight:700}
+.budget>span:first-child{flex:1;font-size:12.5px} .dollar{font-size:18px}
+.budget input{width:120px;font-size:18px;font-weight:800;border:0;outline:0;background:transparent;text-align:right;font-family:inherit;color:#2a2620}
+.row2{display:flex;gap:8px;justify-content:flex-end}
 header{padding-top:calc(9px + env(safe-area-inset-top))}
 footer{padding-bottom:calc(12px + env(safe-area-inset-bottom))}
 #sheetBody{padding-bottom:calc(30px + env(safe-area-inset-bottom))}
@@ -439,11 +444,12 @@ const isSlacking = a => false;   // bots work 24/7: no breaks
 // ================= state =================
 const DAY=45;
 let speed=1;
-function freshState(){ return {v:3, cash:1000, pending:0, day:1, time:.375, nextPayout:3, reports:[], purchases:[], messages:[], nid:1,
+function freshState(budget=1000){ return {v:3, cash:budget, startBudget:budget, pending:0, day:1, time:.375, nextPayout:3, reports:[], purchases:[], messages:[], nid:1,
   total:{units:0,revenue:0,net:0,spent:0,overhead:0,refunds:0}, today:{units:0,revenue:0,net:0,returns:0},
   hunting:false, pendingReport:null, lots:[], lotHunting:false, nextLotHuntAt:0, hired:['scout','stocky','penny','bea'], queues:{}, aiOn:false, aiCalls:0, started:Date.now()}; }
 let G=freshState();
 const now=()=>G.day+G.time;
+const START=()=>G.startBudget||1000;
 const $$=n=>(n<0?'-':'')+'$'+Math.abs(Math.round(n*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 const $0=n=>(n<0?'-':'')+'$'+Math.round(Math.abs(n)).toLocaleString();
 const rr2=(a,b)=>a+Math.random()*(b-a);
@@ -622,7 +628,7 @@ const TASKS={
     apply(tk){ const p=P(tk.ref); if(!p||p.walmart||!['live','done'].includes(p.stage)) return; if(p.stage==='done') return;
       p.walmart={sold:0, listedDay:G.day}; addNote(p,'Wally','Listed on Walmart Marketplace (WFS) at the same price.','rules'); log(`🟦 Wally listed ${p.name} on Walmart`); markSave(); }},
   daily:{
-    prompt:tk=>`${INTRO('Bea','Bookkeeping')}\nWrite Royce's end-of-day money report from these numbers. Total worth = cash + pending payout + inventory at cost. He started with $1,000. Give 2-3 practical tips based on the numbers (cash flow, what's selling, pricing, when to buy more).\n${JSON.stringify(tk.data)}\nReply with only JSON: {"headline":"short headline","summary":"2-3 sentences","tips":["...","..."]}`,
+    prompt:tk=>`${INTRO('Bea','Bookkeeping')}\nWrite Royce's end-of-day money report from these numbers. Total worth = cash + pending payout + inventory at cost. He started with ${$0(START())}. Give 2-3 practical tips based on the numbers (cash flow, what's selling, pricing, when to buy more).\n${JSON.stringify(tk.data)}\nReply with only JSON: {"headline":"short headline","summary":"2-3 sentences","tips":["...","..."]}`,
     parse(tk,ai){ if(!ai||!ai.summary) throw 0; return {headline:S(ai.headline,90), summary:S(ai.summary,600), tips:(Array.isArray(ai.tips)?ai.tips:[]).slice(0,3).map(x=>S(x,200))}; },
     fallback(tk){ const d=tk.data, worth=d.cash+d.pendingPayout+d.inventoryCost;
       return {headline:`Day ${d.day}: ${d.unitsSold} sold, worth ${$0(worth)}`, summary:`We sold ${d.unitsSold} units for ${$$(d.sales)} (${$$(d.afterFees)} after fees). Cash ${$$(d.cash)}, payout pending ${$$(d.pendingPayout)}, inventory ${$0(d.inventoryCost)} at cost.`,
@@ -729,7 +735,7 @@ function briefData(key){
     case 'ebay': return {sellingLots:G.lots.filter(L=>L.stage==='selling').map(L=>({lot:L.name,listed:L.sellable,sold:L.sold,revenue:r2(L.revenue),allIn:L.allIn})), waitingToList:G.lots.filter(L=>L.stage==='arrived').length};
     case 'walmart': return {listedOnWalmart:G.purchases.filter(p=>p.walmart).map(p=>({name:p.name,walmartSold:p.walmart.sold,unitsLeft:p.stock})), liveNotListed:G.purchases.filter(p=>p.stage==='live'&&!p.walmart).length};
     case 'bea': return {day:G.day, today:{unitsSold:G.today.units,sales:r2(G.today.revenue),afterFees:r2(G.today.net)}, cash:r2(G.cash), pendingPayout:r2(G.pending), nextPayoutInDays:G.nextPayout-G.day,
-      inventoryUnits:stockUnits(), inventoryCost:r2(stockValue()), totalWorth:r2(G.cash+G.pending+stockValue()), startedWith:1000, sinceStart:G.total, agentsHired:agents.length, businessCostsPerDay:dailyCosts().total, businessCostsPerMonth:dailyCosts().monthly};
+      inventoryUnits:stockUnits(), inventoryCost:r2(stockValue()), totalWorth:r2(G.cash+G.pending+stockValue()), startedWith:START(), sinceStart:G.total, agentsHired:agents.length, businessCostsPerDay:dailyCosts().total, businessCostsPerMonth:dailyCosts().monthly};
   }
   return {};
 }
@@ -745,7 +751,7 @@ function briefFallback(key){
     case 'liq': return {title:'Liquidation check-in',summary:`${d.lotsBidOn.length} lot(s) bought or bid on.`,bullets:list(d.lotsBidOn,l=>`${l.lot}: ${l.stage} (all-in ${$0(l.allIn)})`)};
     case 'ebay': return {title:'eBay check-in',summary:`${d.sellingLots.length} lot(s) selling, ${d.waitingToList} waiting to be listed.`,bullets:list(d.sellingLots,l=>`${l.lot}: sold ${l.sold}/${l.listed}, ${$0(l.revenue)} sales vs ${$0(l.allIn)} cost`)};
     case 'walmart': return {title:'Walmart check-in',summary:`${d.listedOnWalmart.length} product(s) listed on Walmart, ${d.liveNotListed} live on Amazon but not on Walmart yet.`,bullets:list(d.listedOnWalmart,p=>`${p.name}: ${p.walmartSold} sold on Walmart, ${p.unitsLeft} left`)};
-    case 'bea': return {title:`Money check-in (Day ${d.day})`,summary:`Cash ${$$(d.cash)}, pending payout ${$$(d.pendingPayout)}, inventory ${$$(d.inventoryCost)}. Total worth ${$$(d.totalWorth)} vs $1,000 start.`,bullets:[`Sold ${d.today.unitsSold} today for ${$$(d.today.sales)}`,`Business costs ${$$(d.businessCostsPerDay)}/day (${$0(d.businessCostsPerMonth)}/month)`]};
+    case 'bea': return {title:`Money check-in (Day ${d.day})`,summary:`Cash ${$$(d.cash)}, pending payout ${$$(d.pendingPayout)}, inventory ${$$(d.inventoryCost)}. Total worth ${$$(d.totalWorth)} vs ${$0(d.startedWith)} start.`,bullets:[`Sold ${d.today.unitsSold} today for ${$$(d.today.sales)}`,`Business costs ${$$(d.businessCostsPerDay)}/day (${$0(d.businessCostsPerMonth)}/month)`]};
   }
   return {title:'Report',summary:'Nothing to report.',bullets:[]};
 }
@@ -844,7 +850,7 @@ function simBusiness(dt){
 }
 function endOfDay(){
   const wages=dailyCosts().total; G.cash-=wages; G.total.overhead+=wages;
-  const d={day:G.day, unitsSold:G.today.units, sales:r2(G.today.revenue), afterFees:r2(G.today.net), refunds:G.today.returns, agentCosts:wages,
+  const d={day:G.day, startedWith:START(), unitsSold:G.today.units, sales:r2(G.today.revenue), afterFees:r2(G.today.net), refunds:G.today.returns, agentCosts:wages,
     cash:r2(G.cash), pendingPayout:r2(G.pending), nextPayoutInDays:G.nextPayout-G.day-1, inventoryUnits:stockUnits(), inventoryCost:r2(stockValue()),
     sinceStart:{spentOnInventory:r2(G.total.spent),sales:r2(G.total.revenue),afterFees:r2(G.total.net),agentCosts:r2(G.total.overhead),refunds:r2(G.total.refunds)},
     products:G.purchases.filter(p=>!['done'].includes(p.stage)).slice(0,8).map(p=>({name:p.name,stage:p.stage,price:p.price,left:p.stock,sold:p.sold}))};
@@ -946,11 +952,11 @@ async function boot(){
       saveRef={get:async()=>{ const v=ls.getItem(KEY); return {exists:!!v, data:()=>v?JSON.parse(v):undefined}; }, set:async(d)=>{ ls.setItem(KEY,JSON.stringify(d)); }};
       const v=ls.getItem(KEY);
       if(v){ try{ loadState(JSON.parse(v).json); saveStatus=`Loaded · Day ${G.day} (saved on this device)`; return finish(`💾 Welcome back! Loaded your company at Day ${G.day}.`); }catch(e){ console.error(e); G=freshState(); agents=[]; } }
-      saveStatus='Saving on this device'; return finish('🏢 Day 1: You have $1,000 (pretend). Scout is reviewing today’s leads…');
-    }catch(e){ saveRef=null; saveStatus='Saving unavailable here'; return finish('🏢 Day 1: You have $1,000 (pretend). Scout is reviewing today’s leads…'); } };
+      saveStatus='Saving on this device'; return finish(`🏢 Day 1: You have ${$0(G.cash)} (pretend). Scout is reviewing today’s leads…`);
+    }catch(e){ saveRef=null; saveStatus='Saving unavailable here'; return finish(`🏢 Day 1: You have ${$0(G.cash)} (pretend). Scout is reviewing today’s leads…`); } };
   const finish=(msg)=>{ if(booted) return; booted=true; if(!agents.length) [0,3,5,7].forEach(i=>agents.push(makeAgent(i)));
     log(msg); updStats(); renderSheetSoon(); document.getElementById('loading').style.display='none'; };
-  const timer=setTimeout(()=>finish('🏢 Day 1: You have $1,000 (pretend). Scout is reviewing today’s leads… (couldn’t reach saved games)'),10000);
+  const timer=setTimeout(()=>finish(`🏢 Day 1: You have ${$0(G.cash)} (pretend). Scout is reviewing today’s leads… (couldn’t reach saved games)`),10000);
   try{
     if(!window.claude) return localBoot();
     const [db,user]=await Promise.all([claude.use('db'),claude.use('user')]);
@@ -958,14 +964,14 @@ async function boot(){
     if(db&&uid){ DB=db; UID=uid; saveRef=db.doc(`data/users/${uid}/ggnsave`); const snap=await saveRef.get();
       clearTimeout(timer);
       if(snap.exists && snap.data().json){ try{ loadState(snap.data().json); saveStatus=`Loaded · Day ${G.day}`; return finish(`💾 Welcome back! Loaded your company at Day ${G.day}.`); }catch(e){ console.error(e); G=freshState(); agents=[]; } }
-      saveStatus='New game (saving on)'; return finish('🏢 Day 1: You have $1,000 (pretend). Scout is reviewing today’s leads…');
+      saveStatus='New game (saving on)'; return finish(`🏢 Day 1: You have ${$0(G.cash)} (pretend). Scout is reviewing today’s leads…`);
     }
     throw 0;
-  }catch(e){ clearTimeout(timer); saveStatus='Saving unavailable here'; finish('🏢 Day 1: You have $1,000 (pretend). Scout is reviewing today’s leads…'); }
+  }catch(e){ clearTimeout(timer); saveStatus='Saving unavailable here'; finish(`🏢 Day 1: You have ${$0(G.cash)} (pretend). Scout is reviewing today’s leads…`); }
 }
-async function newGame(){
-  G=freshState(); agents=[]; [0,3,5,7].forEach(i=>agents.push(makeAgent(i))); aiLog.length=0; speed=1; speedBtn.textContent='1×';
-  log('🆕 New game! Day 1 with $1,000 (pretend).'); saveDirty=true; await saveNow(); renderSheet(); updStats();
+async function newGame(budget){
+  G=freshState(budget||1000); agents=[]; [0,3,5,7].forEach(i=>agents.push(makeAgent(i))); aiLog.length=0; speed=1; speedBtn.textContent='1×';
+  log(`🆕 New game! Day 1 with ${$0(G.cash)} (pretend).`); saveDirty=true; await saveNow(); renderSheet(); updStats();
 }
 // ================= drawing: walls & floor =================
 const sky = []; for(let k=0;k<200;k++) sky.push(rnd());
@@ -1231,7 +1237,7 @@ document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>openSheet(b.d
 sheetClose.onclick=closeSheet;
 navRep.onclick=()=>openSheet('reports'); navProd.onclick=()=>openSheet('products'); navTeam.onclick=()=>openSheet('team'); navAI.onclick=()=>openSheet('ai');
 function renderSheetSoon(){ dirty=true; }
-setInterval(()=>{ const openDetails=body.querySelector('details[open]');
+setInterval(()=>{ const openDetails=body.querySelector('details[open]') || (document.activeElement&&document.activeElement.tagName==='INPUT'&&body.contains(document.activeElement));
   if(sheetOpen && !openDetails && (dirty || tab==='products' || (tab==='ai' && aiLog.some(e=>e.status==='thinking'||e.status==='waiting')))){ dirty=false; const y=body.scrollTop; renderSheet(); body.scrollTop=y; }
   else if(dirty && !sheetOpen) dirty=false; updStats(); },800);
 
@@ -1329,7 +1335,7 @@ function reportView(rep){
       ${rep.fails?`<p class="mut">Rejected today: ${Object.entries(rep.fails).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${esc(k)} (${v})`).join(' · ')}</p>`:''}</details>
     ${rep.summary?`<div class="say big"><b>Scout:</b> ${esc(rep.summary)} ${srcTag(rep.src)}</div>`:''}
     ${rep.leads.map(l=>leadCard(rep,l)).join('')}`;
-  const d=rep.d, tt=d.sinceStart, worth=d.cash+d.pendingPayout+d.inventoryCost;
+  const d=rep.d, tt=d.sinceStart, worth=d.cash+d.pendingPayout+d.inventoryCost, st0=d.startedWith||START();
   return `<button class="back" data-a="back">‹ All reports</button>
     <h3>📊 ${esc(rep.headline||('Day '+d.day+' money report'))}</h3><p class="mut">Day ${d.day} · from Bea, Bookkeeping ${srcTag(rep.src)}</p>
     <div class="say big">${esc(rep.summary)}</div>
@@ -1343,8 +1349,8 @@ function reportView(rep){
       <div><span>Cash in bank</span><b>${$$(d.cash)}</b></div>
       <div><span>Pending payout</span><b>${$$(d.pendingPayout)}</b></div>
       <div><span>Inventory</span><b>${d.inventoryUnits} units (${$0(d.inventoryCost)})</b></div>
-      <div><span>Total worth</span><b class="${worth>=1000?'g':'r'}">${$0(worth)}</b></div>
-      <div><span>vs. $1,000 start</span><b class="${worth>=1000?'g':'r'}">${worth>=1000?'+':''}${$0(worth-1000)}</b></div>
+      <div><span>Total worth</span><b class="${worth>=st0?'g':'r'}">${$0(worth)}</b></div>
+      <div><span>vs. ${$0(st0)} start</span><b class="${worth>=st0?'g':'r'}">${worth>=st0?'+':''}${$0(worth-st0)}</b></div>
     </div>
     <h4>Since you started</h4>
     <div class="money">
@@ -1374,7 +1380,8 @@ function fmtOut(o){
   }catch(e){}
   return `<div>${esc(JSON.stringify(o)).slice(0,300)}</div>`;
 }
-let confirmNew=false;
+let confirmNew=false, budgetDraft='1000';
+document.addEventListener('input',e=>{ if(e.target&&e.target.id==='budgetIn') budgetDraft=e.target.value; });
 function renderSheet(){
   let h='';
   if(tab==='reports'){
@@ -1408,7 +1415,12 @@ function renderSheet(){
     const aiCard = `<div class="aicard ${G.aiOn&&AI?'on':''}"><div><b>🧠 AI brains: ${!aiReady?'checking…':!AI?'not available here':G.aiOn?'ON':'OFF'}</b>
       <span>${aiReady&&!AI?'Open this in the Claude app or on claude.ai to let agents think with Claude. Until then they use backup rules.':'When ON, every agent thinks with Claude: Scout picks products, Rex reads price charts, Ivy judges IP risk, Stocky writes POs, Lexi plans shipments, Penny sets prices, Hana answers buyers, Bea writes your report. It uses your Claude usage (<b>'+G.aiCalls+'</b> calls so far). When OFF, they follow simple backup rules.'}</span></div>
       ${AI?`<button class="hire" data-a="ai">${G.aiOn?'Turn off':'Turn on'}</button>`:''}</div>`;
-    const saveCard = `<div class="savecard"><span>💾 ${esc(saveStatus)}</span><button class="skipb" data-a="new">${confirmNew?'Tap again to erase & restart':'New game'}</button></div>`;
+    const saveCard = confirmNew
+      ? `<div class="newcard"><b>🆕 Start a new game</b><span>This erases your current company. Practice with your real startup budget:</span>
+          <label class="budget"><span>Starting budget</span><span class="dollar">$</span><input id="budgetIn" type="number" inputmode="decimal" min="100" max="1000000" step="50" value="${esc(budgetDraft)}"></label>
+          <div class="row2"><button class="skipb" data-a="newcancel">Cancel</button><button class="buyb" data-a="newgo">Start new game</button></div>
+          <span class="mut" id="budgetErr"></span></div>`
+      : `<div class="savecard"><span>💾 ${esc(saveStatus)} · started with ${$0(START())}</span><button class="skipb" data-a="new">New game</button></div>`;
     h = `<div class="aicard"><div><b>📏 Rules mode</b><span>Agents follow your buy rules and simple built-in logic. No AI, so nothing uses your Claude usage.</span></div></div>` + (()=>{ const c=dailyCosts(); return `<div class="costcard"><b>💸 Monthly business costs</b><span>The bots themselves are free. These are what running the real business would cost, charged a little each day.</span>
       ${c.items.map(x=>`<div class="crow"><span>${esc(x.name)}<i>${esc(x.why)}</i></span><b>${$$(x.monthly)}/mo</b></div>`).join('')}
       <div class="crow tot"><span>Total</span><b>${$$(c.monthly)}/mo · ${$$(c.total)}/day</b></div></div>`; })() + ROLES.map((r,idx)=>{
@@ -1429,7 +1441,11 @@ body.addEventListener('click',e=>{
     if(r.key==='ebay'){ G.lots.filter(L=>L.stage==='arrived').forEach(L=>queueTask('ebay',{kind:'listlot',title:'List lot on eBay: '+L.name,dur:8,ref:L.id})); }
     markSave(); renderSheet(); return; }
   if(act==='ai'){ toggleAI(); return; }
-  if(act==='new'){ if(!confirmNew){ confirmNew=true; renderSheet(); setTimeout(()=>{ confirmNew=false; renderSheetSoon(); },4000); return; } confirmNew=false; newGame(); return; }
+  if(act==='new'){ confirmNew=true; budgetDraft=String(START()); renderSheet(); body.scrollTop=body.scrollHeight; return; }
+  if(act==='newcancel'){ confirmNew=false; renderSheet(); return; }
+  if(act==='newgo'){ const v=Math.round(parseFloat(String(budgetDraft).replace(/[^0-9.]/g,''))||0);
+    if(v<100||v>1000000){ const e=document.getElementById('budgetErr'); if(e) e.textContent='Enter an amount between $100 and $1,000,000.'; return; }
+    confirmNew=false; newGame(v); return; }
   const rep=G.reports.find(r=>r.id===openRep); if(!rep) return;
   if(act==='lotbuy'||act==='lotskip'){ const lt=rep.lots.find(x=>x.id===+b.dataset.l); if(!lt||lt.decision) return; const y=body.scrollTop;
     if(act==='lotbuy') approveLot(rep,lt); else { lt.decision={skip:true}; markSave(); } renderSheet(); body.scrollTop=y; return; }
