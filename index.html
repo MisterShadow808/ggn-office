@@ -1213,7 +1213,7 @@ aiChip.onclick=()=>openSheet('team');
 let tab='reports', sheetOpen=false, openRep=null, dirty=false;
 const sheet=document.getElementById('sheet'), body=document.getElementById('sheetBody');
 function openSheet(which){ tab=which; sheetOpen=true; sheet.classList.add('open'); document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab)); renderSheet(); }
-function closeSheet(){ sheetOpen=false; sheet.classList.remove('open'); }
+function closeSheet(){ sheetOpen=false; sheet.classList.remove('open'); openRep=null; }
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>openSheet(b.dataset.t));
 sheetClose.onclick=closeSheet;
 navRep.onclick=()=>openSheet('reports'); navProd.onclick=()=>openSheet('products'); navTeam.onclick=()=>openSheet('team'); navAI.onclick=()=>openSheet('ai');
