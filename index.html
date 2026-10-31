@@ -172,6 +172,16 @@ pre{white-space:pre-wrap;word-break:break-word;background:#f6f1e4;border-radius:
 .age{font-size:11px;color:#8a7f66;margin:4px 0}
 .pchg{background:#fff1d6;border:1px solid #e8c33a;border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.45;margin-top:8px}
 .chip.hot{background:#ffe2d6;color:#c5462a}
+.ritem.alert{border:2px solid #e5484d;background:#fff4f2}
+.invtabs{display:flex;gap:5px;overflow-x:auto;margin:0 -2px 10px;padding:0 2px 2px;-webkit-overflow-scrolling:touch}
+.invtabs button{flex:none;background:#f4eedf;color:#2a2620;border:1px solid #eadfc6;padding:7px 10px;font-size:12px;white-space:nowrap}
+.invtabs button.on{background:#2a2620;color:#fff;border-color:#2a2620}.invtabs i{font-style:normal;opacity:.7;font-size:11px}
+.invsum{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.invsum div{background:#fff;border:1px solid #eadfc6;border-radius:10px;padding:7px 4px;text-align:center;display:flex;flex-direction:column}
+.invsum b{font-size:14px}.invsum span{font-size:10px;color:#8a7f66;text-transform:uppercase;letter-spacing:.3px}.tip{margin:6px 2px 4px}
+.prod.tap{cursor:pointer}.prod.sel{border-color:#2a2620;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.invd{margin-top:9px;border-top:1px dashed #eadfc6;padding-top:9px;cursor:default}.invstats{display:flex;flex-direction:column;gap:2px;margin-bottom:8px;font-size:12px}
+.wide{width:100%;padding:11px}.scan{background:#f4eedf;border-radius:10px;padding:12px;text-align:center;animation:pulse 1s infinite alternate}
+@keyframes pulse{from{opacity:.55}to{opacity:1}}.invscan .lead{margin:4px 0 8px;border-color:#2a2620}
 header{padding-top:calc(9px + env(safe-area-inset-top))}
 footer{padding-bottom:calc(12px + env(safe-area-inset-bottom))}
 #sheetBody{padding-bottom:calc(30px + env(safe-area-inset-bottom))}
@@ -662,8 +672,32 @@ function recalcLead(l){
   l.best=bestMarket(l); l.market=l.best||'amazon'; }
 function freshLead(snap){ const l=JSON.parse(JSON.stringify(snap)); l.id=G.nid++; l.foundAt=now(); l.checkedAt=now(); delete l.hot; delete l.expiresAt; delete l.pendingChange; l.decision=null; l.qty=0; delete l.rex; delete l.ivy; delete l.scout; l.ipFail=false; return l; }
 function leadSnap(l){ const x=JSON.parse(JSON.stringify(l)); delete x.decision; delete x.rex; delete x.ivy; delete x.scout; return x; }
+function restockScan(p,who,manual){
+      const l=freshLead(p.leadSnap); const ch=p.channel||'amazon', orig=p.lead.store;
+      // 1) original store first, 2) then other stores
+      const sources=[{store:orig, orig:true, paid:p.cost, oos:Math.random()<.1, price:r2(p.cost*(Math.random()<.4?1:rr2(.9,1.12)))}];
+      for(const st of STORES.filter(x=>x!==orig).sort(()=>Math.random()-.5).slice(0,4)) sources.push({store:st, oos:Math.random()<.2, price:r2(p.cost*rr2(.82,1.18))});
+      const inStock=sources.filter(x=>!x.oos).sort((a,b)=>a.price-b.price);
+      l.sources=sources; l.paid=p.cost;
+      const pd=rr2(.92,1.08); l.buyBox=r2(l.buyBox*pd); l.ourPrice=r2(l.ourPrice*pd); l.markets.amazon.price=l.ourPrice;
+      for(const m of ['walmart','ebay']) l.markets[m].price=r2(l.markets[m].price*rr2(.94,1.06));
+      if(inStock.length){ l.store=inStock[0].store; l.cost=inStock[0].price; } else l.cost=p.cost;
+      recalcLead(l); if(l.markets[ch]) l.market=ch;
+      const profit=p.net-p.qty*(p.cost+p.lead.prep), o=sources[0], ok=inStock.length&&passesAny(l);
+      const origLine = o.oos ? `${orig} (where you bought it) is out of stock right now.` : o.price===p.cost ? `${orig} still has it at ${$$(o.price)}, the same as you paid.` : `${orig} now has it at ${$$(o.price)} (you paid ${$$(p.cost)}).`;
+      const cheapLine = !inStock.length ? 'None of the stores I checked have it in stock.' : inStock[0].store!==orig ? `Cheapest today: ${inStock[0].store} at ${$$(inStock[0].price)}${o.oos?'':`, ${$$(o.price-inStock[0].price)} less per unit than ${orig}`}.` : `${orig} is still the cheapest of ${inStock.length} stores checked.`;
+      const head = p.stock>0 ? `${p.name} on ${MKT_LABEL[ch]}: ${p.stock} of ${p.qty} left, ${p.sold} sold so far (${$0(profit)} profit). ` : `${p.name} sold out on ${MKT_LABEL[ch]}: ${p.qty} units for ${$0(profit)} profit${p.soldOutIn!=null?` in ${p.soldOutIn} day${p.soldOutIn===1?'':'s'}`:''}. `;
+      const summary=head+`${origLine} ${cheapLine} `+
+        (ok?`At the cheapest price it still meets your rules${l.best?`, best on ${MKT_LABEL[l.best]} at ${Math.round(l.markets[l.best].roi*100)}% ROI`:''}. Want to reorder?`:inStock.length?`It no longer meets your rules (${(l.markets[ch].why||[]).join(', ')}), so I'd hold off.`:'I’ll check again on the next sell-out.');
+      l.restock=true; l.scout={verdict:'recommend',note:summary,src:'rules',who:(ROLES.find(r=>r.key===who)||{name:'Scout'}).name}; l.restockOf=p.id; l.qty=suggestQtyM(l,l.market);
+      return {l,ok,cheaper:inStock.length&&inStock[0].store!==orig?inStock[0].store:null}; }
+// popular = sold out within a week of going live, or selling 1.5+ a day
+function isPopular(p){ const live=p.liveAt?Math.max(.25,now()-p.liveAt):null; return live!=null && (live<=7 || p.qty/live>=1.5); }
+function restockAlert(p){ const who=p.foundBy&&hiredA(p.foundBy)?p.foundBy:'scout';
+  const {l,ok}=restockScan(p,who); const rp=oneLeadReport('restock',who,l,l.scout.note,{alert:true}); l.qty=ok?suggestQtyM(l,l.market):0;
+  notify(`🚨 Restock alert: ${p.name} sold out ${p.soldOutIn!=null?`in ${p.soldOutIn} day${p.soldOutIn===1?'':'s'}`:'fast'} on ${MKT_LABEL[p.channel||'amazon']}. Tap Reports to reorder.`); markSave(); return rp; }
 function queueRestock(p){ if(!p.leadSnap||p.restockQueued) return; const profit=p.net-p.qty*(p.cost+p.lead.prep); if(profit<=0) return;
-  p.restockQueued=true; const who=p.foundBy&&hiredA(p.foundBy)?p.foundBy:'scout';
+  p.restockQueued=true; if(isPopular(p)){ restockAlert(p); return; } const who=p.foundBy&&hiredA(p.foundBy)?p.foundBy:'scout';
   queueTask(who,{kind:'restock',title:'Re-check: '+p.name,dur:5,ref:p.id,who}); }
 function nearMiss(l){ let best=null;
   for(const m of MKTS){ const x=l.markets[m]; if(!x.why||x.why.length!==1||x.why[0]!=='ROI under 25%'||x.roi<.1) continue;
@@ -706,8 +740,8 @@ function sendDigest(owner,onDemand){
 function sendAllDigests(){ for(const owner of Object.keys(G.digest||{})) sendDigest(owner,false); }
 
 // ---------- freshness: hot-deal alerts, re-checks, deal age ----------
-const HOT={roi:1.5, profit:20, perDay:1, teamPerDay:2};   // practice thresholds: ROI ≥ 150% and profit ≥ $20/unit (or a watchlist price drop); max 1 per bot, 2 per day overall
-const isHot=l=>{ const x=l.best&&l.markets?l.markets[l.best]:null; return !!x && (l.watchHit || (x.roi>=HOT.roi && x.profit>=HOT.profit)); };
+const HOT={roi:1.0, profit:20, perDay:1, teamPerDay:2};   // practice thresholds: ROI above 100% and profit ≥ $20/unit (or a watchlist price drop); max 1 per bot, 2 per day overall
+const isHot=l=>{ const x=l.best&&l.markets?l.markets[l.best]:null; return !!x && (l.watchHit || (x.roi>HOT.roi && x.profit>=HOT.profit)); };
 function hotAllowed(owner){ const H=G.hot=G.hot||{}; const h=H[owner]; const team=Object.values(H).filter(x=>x&&x.day===G.day).reduce((a,x)=>a+x.n,0); return team<HOT.teamPerDay && (!h||h.day!==G.day||h.n<HOT.perDay); }
 function sendHot(owner,l){ const H=G.hot=G.hot||{}; if(!H[owner]||H[owner].day!==G.day) H[owner]={day:G.day,n:0}; H[owner].n++;
   const nm=(ROLES.find(r=>r.key===owner)||{name:'Scout'}).name;
@@ -848,25 +882,10 @@ const TASKS={
       log(`🔀 ${who} found a move idea for ${p.name} (in today's report)`); markSave(); }},
   restock:{
     parse(){ throw 0; }, fallback(){ return {}; },
-    apply(tk){ const p=P(tk.ref); if(!p||!p.leadSnap) return;
-      const l=freshLead(p.leadSnap); const ch=p.channel||'amazon', orig=p.lead.store;
-      // 1) original store first, 2) then other stores
-      const sources=[{store:orig, orig:true, paid:p.cost, oos:Math.random()<.1, price:r2(p.cost*(Math.random()<.4?1:rr2(.9,1.12)))}];
-      for(const st of STORES.filter(x=>x!==orig).sort(()=>Math.random()-.5).slice(0,4)) sources.push({store:st, oos:Math.random()<.2, price:r2(p.cost*rr2(.82,1.18))});
-      const inStock=sources.filter(x=>!x.oos).sort((a,b)=>a.price-b.price);
-      l.sources=sources; l.paid=p.cost;
-      const pd=rr2(.92,1.08); l.buyBox=r2(l.buyBox*pd); l.ourPrice=r2(l.ourPrice*pd); l.markets.amazon.price=l.ourPrice;
-      for(const m of ['walmart','ebay']) l.markets[m].price=r2(l.markets[m].price*rr2(.94,1.06));
-      if(inStock.length){ l.store=inStock[0].store; l.cost=inStock[0].price; } else l.cost=p.cost;
-      recalcLead(l); if(l.markets[ch]) l.market=ch;
-      const profit=p.net-p.qty*(p.cost+p.lead.prep), o=sources[0], ok=inStock.length&&passesAny(l);
-      const origLine = o.oos ? `${orig} (where you bought it) is out of stock right now.` : o.price===p.cost ? `${orig} still has it at ${$$(o.price)}, the same as you paid.` : `${orig} now has it at ${$$(o.price)} (you paid ${$$(p.cost)}).`;
-      const cheapLine = !inStock.length ? 'None of the stores I checked have it in stock.' : inStock[0].store!==orig ? `Cheapest today: ${inStock[0].store} at ${$$(inStock[0].price)}${o.oos?'':`, ${$$(o.price-inStock[0].price)} less per unit than ${orig}`}.` : `${orig} is still the cheapest of ${inStock.length} stores checked.`;
-      const summary=`${p.name} sold out on ${MKT_LABEL[ch]}: ${p.qty} units for ${$0(profit)} profit. ${origLine} ${cheapLine} `+
-        (ok?`At the cheapest price it still meets your rules${l.best?`, best on ${MKT_LABEL[l.best]} at ${Math.round(l.markets[l.best].roi*100)}% ROI`:''}. Want to reorder?`:inStock.length?`It no longer meets your rules (${(l.markets[ch].why||[]).join(', ')}), so I'd hold off.`:'I’ll check again on the next sell-out.');
-      l.restock=true; l.scout={verdict:'recommend',note:summary,src:'rules',who:(ROLES.find(r=>r.key===(tk.who||'scout'))||{name:'Scout'}).name}; l.qty=suggestQtyM(l,l.market);
-      digestAdd(tk.who||'scout',[l]);
-      log(ok?`🔁 Restock check on ${p.name} added to today’s report${inStock[0].store!==orig?' (cheaper at '+inStock[0].store+')':''}`:`🔁 Restock check: ${p.name} doesn't pass right now (in today’s report)`); markSave(); }},
+    apply(tk){ const p=P(tk.ref); if(!p||!p.leadSnap) return; const who=tk.who||'scout';
+      const {l,ok,cheaper}=restockScan(p,who);
+      digestAdd(who,[l]);
+      log(ok?`🔁 Restock check on ${p.name} added to today’s report${cheaper?' (cheaper at '+cheaper+')':''}`:`🔁 Restock check: ${p.name} doesn't pass right now (in today’s report)`); markSave(); }},
   watch:{
     parse(){ throw 0; }, fallback(){ return {}; },
     apply(){ const W=G.watch=G.watch||[];
@@ -892,7 +911,7 @@ const TASKS={
 };
 function P(id){ return G.purchases.find(p=>p.id===id); }
 function addNote(p,who,text,src){ (p.notes=p.notes||[]).unshift({who,text,src,day:G.day}); if(p.notes.length>6) p.notes.pop(); }
-function trimReports(){ if(G.reports.length>30) G.reports.length=30; }
+function trimReports(){ if(G.reports.length>30){ const keep=G.reports.filter(r=>r.alert&&r.leads.some(l=>!l.decision)); G.reports=G.reports.slice(0,30); for(const k of keep) if(!G.reports.includes(k)) G.reports.push(k); } }
 function queueTask(key,task,fallbackKey,slow=1.6){
   let a=hiredA(key);
   if(!a && fallbackKey){ a=hiredA(fallbackKey); if(a){ task.dur*=slow; task.title+=' (covering)'; } }
@@ -1095,7 +1114,7 @@ function sale(p,ch){
   if(Math.random()<.05){ const m=makeMessage(p);
     if(hiredA('hana')){ G.messages.push(m); if(G.messages.length>40) G.messages.splice(0,G.messages.length-40); queueSupport(); }
     else { G.messages.push(m); resolveMessage(m, ['late','question','happy'].includes(m.kind)?'reply':'refund','(auto-handled, no support agent)','rules','Amazon'); } }
-  if(p.stock<=0){ p.stage='done'; notify(`🎉 Sold out: ${p.name}! Profit ${$0(p.net-p.qty*(p.cost+p.lead.prep))}`); queueRestock(p); }
+  if(p.stock<=0){ p.stage='done'; p.soldOutIn=p.liveAt?Math.max(1,Math.round(now()-p.liveAt)):null; notify(`🎉 Sold out: ${p.name}! Profit ${$0(p.net-p.qty*(p.cost+p.lead.prep))}`); queueRestock(p); }
 }
 function simBusiness(dt){
   const dd=dt/DAY; G.time+=dd;
@@ -1522,7 +1541,7 @@ aiChip.onclick=()=>openSheet('team');
 // ================= sheet (Reports / Products / Team) =================
 let tab='reports', sheetOpen=false, openRep=null, dirty=false;
 const sheet=document.getElementById('sheet'), body=document.getElementById('sheetBody');
-function openSheet(which){ tab=which; sheetOpen=true; sheet.classList.add('open'); document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab)); renderSheet(); }
+function openSheet(which){ if(which!=='products'){ invOpen=null; invRep=null; } tab=which; sheetOpen=true; sheet.classList.add('open'); document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab)); renderSheet(); }
 function closeSheet(){ sheetOpen=false; sheet.classList.remove('open'); openRep=null; }
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>openSheet(b.dataset.t));
 sheetClose.onclick=closeSheet;
@@ -1593,7 +1612,7 @@ setBtn.onclick=()=>openSheet('settings');
 navRep.onclick=()=>openSheet('reports'); navProd.onclick=()=>openSheet('products'); navTeam.onclick=()=>openSheet('team'); navAI.onclick=()=>openSheet('ai');
 function renderSheetSoon(){ dirty=true; }
 setInterval(()=>{ const openDetails=body.querySelector('details[open]') || (document.activeElement&&document.activeElement.tagName==='INPUT'&&body.contains(document.activeElement));
-  if(sheetOpen && !openDetails && tab!=='settings' && (dirty || tab==='products' || (tab==='ai' && aiLog.some(e=>e.status==='thinking'||e.status==='waiting')))){ dirty=false; const y=body.scrollTop; renderSheet(); body.scrollTop=y; }
+  if(sheetOpen && !openDetails && tab!=='settings' && !(tab==='products'&&invOpen!=null) && (dirty || tab==='products' || (tab==='ai' && aiLog.some(e=>e.status==='thinking'||e.status==='waiting')))){ dirty=false; const y=body.scrollTop; renderSheet(); body.scrollTop=y; }
   else if(dirty && !sheetOpen) dirty=false; updStats(); },800);
 
 const ck=(v,unknown)=> unknown? '<span class="q">?</span>' : v? '<span class="y">✓</span>':'<span class="n">✗</span>';
@@ -1686,6 +1705,24 @@ function watchCard(){ const W=G.watch||[]; if(!W.length) return '';
     return `<div class="prod"><div class="lh"><b>${esc(w.lead.name)}</b><button class="unw" data-a="unwatch" data-w="${w.id}">✕</button></div>
       <div class="pr"><span>${esc(w.lead.store)} · now <b>${$$(now_)}</b></span><span>target <b class="g">${$$(w.target)}</b> for ${MKT_LABEL[w.market]}</span></div>
       <div class="pbar"><i style="width:${pct}%" class="live"></i></div><div class="pr"><span class="mut">was ${$$(w.was)}</span><span class="mut">${Math.max(0,w.expires-G.day)} days left</span></div></div>`; }).join(''); }
+// ---------- inventory by marketplace ----------
+let invMk='all', invOpen=null, invRep=null, invScanning=null;
+function invTabs(){ const n=m=>G.purchases.filter(p=>(p.channel||'amazon')===m&&!['done','moved','suppressed'].includes(p.stage)).length;
+  const t=[['all','All',G.purchases.filter(p=>!['done','moved','suppressed'].includes(p.stage)).length],...MKTS.map(m=>[m,MKT_ICON[m]+' '+MKT_LABEL[m],n(m)]),['lots','🏗️ Lots',(G.lots||[]).length]];
+  return `<div class="invtabs">${t.map(([k,lab,c])=>`<button data-a="invmk" data-m="${k}" class="${invMk===k?'on':''}">${lab}${c?` <i>${c}</i>`:''}</button>`).join('')}</div>`; }
+function invSummary(list){ const act=list.filter(p=>!['done','moved','suppressed'].includes(p.stage));
+  const inStock=act.filter(p=>p.stage==='live').reduce((a,p)=>a+p.stock,0), inbound=act.filter(p=>p.stage!=='live').reduce((a,p)=>a+p.stock,0);
+  const value=act.reduce((a,p)=>a+p.stock*(p.cost+p.lead.prep),0), out=list.filter(p=>p.stage==='done').length, sold7=list.reduce((a,p)=>a+p.sold,0);
+  return `<div class="invsum"><div><b>${inStock}</b><span>Live units</span></div><div><b>${inbound}</b><span>Inbound</span></div><div><b>${$0(value)}</b><span>Stock value</span></div><div><b>${out}</b><span>Sold out</span></div></div>
+    <p class="mut tip">Tap a product for details and 🔁 Restock. ${sold7} sold all-time here.</p>`; }
+function invDetail(p){ const ch=p.channel||'amazon', live=p.liveAt?Math.max(.25,now()-p.liveAt):0, rate=live?p.sold/live:0;
+  const daysLeft=rate>0&&p.stock>0?Math.round(p.stock/rate):null;
+  let h=`<div class="invd" data-a="noop"><div class="invstats"><span>From <b>${esc(p.lead.store)}</b> at ${$$(p.cost)}</span><span>Selling <b>${rate?r2(rate):0}</b>/day${daysLeft!=null?` · ~${daysLeft} days left`:''}</span>${p.stage==='done'&&p.soldOutIn!=null?`<span>Sold out in <b>${p.soldOutIn}</b> day${p.soldOutIn===1?'':'s'}${isPopular(p)?' 🔥':''}</span>`:''}</div>`;
+  if(!p.leadSnap) return h+`<span class="mut">No restock data for this item.</span></div>`;
+  if(invScanning===p.id) return h+`<div class="scan">🔎 Checking ${esc(p.lead.store)} first, then 4 other stores…</div></div>`;
+  if(invRep&&invRep.pid===p.id){ const l=invRep.leads[0];
+    return h+`<div class="invscan">${leadCard(invRep,l)}${l.decision?`<button class="skipb wide" data-a="invrescan" data-p="${p.id}">🔁 Scan again</button>`:''}</div></div>`; }
+  return h+`<button class="buyb wide" data-a="invrestock" data-p="${p.id}">🔁 Restock: scan prices now</button></div>`; }
 function lotRow(L){
   const label={bidding:'Bid placed: waiting on the auction',lost:'Outbid (money returned)',freight:'Won! Freight heading to warehouse',arrived:'At warehouse: waiting for eBay listing',selling:'Selling on eBay',done:'Sold through'};
   const pct={bidding:.15,lost:1,freight:.35,arrived:.55,selling:.8,done:1};
@@ -1719,7 +1756,7 @@ function reportView(rep){
     <h3>📋 ${esc(rep.title||'Report')}</h3><p class="mut">Day ${rep.day} · from ${rep.from}, ${rep.role} ${srcTag(rep.src)}</p>
     <div class="say big">${esc(rep.summary)}</div>${rep.bullets&&rep.bullets.length?`<ul class="tips">${rep.bullets.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}`;
   if(rep.type==='products') return `<button class="back" data-a="back">‹ All reports</button>
-    <h3>${rep.hot?'🔥 Hot deal':rep.digest?'📋 Daily report':rep.restock?'🔁 Restock check':rep.watch?'👀 Price-drop alert':'📋 Product report'} from ${esc(rep.from||'Scout')}</h3>
+    <h3>${rep.hot?'🔥 Hot deal':rep.digest?'📋 Daily report':rep.restock?(rep.alert?'🚨 Restock alert':'🔁 Restock check'):rep.watch?'👀 Price-drop alert':'📋 Product report'} from ${esc(rep.from||'Scout')}</h3>
     <p class="mut">Day ${rep.day}${rep.checked&&!rep.restock&&!rep.watch?` · Checked <b>${rep.checked}</b> products${rep.source?` on ${esc(rep.source)}`:''}, <b>${rep.leads.length}</b> met the rules on at least one marketplace`:''}${rep.leads.some(l=>l.rex)?' · Rex checked price history':''}${rep.leads.some(l=>l.ivy)?' · Ivy checked IP risk':''}. Nothing is bought until you approve. Highest ROI first.</p>
     ${rep.removed&&(rep.removed.ip||rep.removed.unstable)?`<div class="say">🧹 Screened out: ${rep.removed.ip?`<b>${rep.removed.ip}</b> IP-risky (Ivy)`:''}${rep.removed.ip&&rep.removed.unstable?' · ':''}${rep.removed.unstable?`<b>${rep.removed.unstable}</b> price-unstable (Rex)`:''}</div>`:''}
     ${rep.removed&&(!rep.removed.rexOn||!rep.removed.ivyOn)?`<div class="say">⚠️ ${!rep.removed.rexOn&&!rep.removed.ivyOn?'Hire <b>Rex</b> and <b>Ivy</b>':!rep.removed.rexOn?'Hire <b>Rex</b>':'Hire <b>Ivy</b>'} in the Team tab so unstable-price and IP-risky products get removed automatically.</div>`:''}
@@ -1783,10 +1820,11 @@ function renderSheet(){
     if(!h){ openRep=null;
       if(G.reports.length) h+=`<div class="rtools"><button class="skipb" data-a="readall">✓ Mark all read</button><button class="skipb" data-a="clearrep">🧹 Clear finished</button></div>`;
       for(const pr of (G.pendings||[])) h+=`<div class="ritem pending"><div><b>⏳ ${esc(pr.from||'Scout')}'s report in progress</b><span class="mut">${!pr.rexDone?'Rex is checking price history':'Ivy is checking IP risk'}…</span></div></div>`;
-      h += G.reports.length ? G.reports.map(r=>{
+      const pinned=r=>r.alert&&r.leads&&r.leads.some(l=>!l.decision);
+      h += G.reports.length ? [...G.reports.filter(pinned),...G.reports.filter(r=>!pinned(r))].map(r=>{
         const pend = r.type==='products' ? r.leads.filter(l=>!l.decision).length+(r.moves||[]).filter(v=>!v.decision).length : 0;
-        return `<div class="ritem" data-a="open" data-r="${r.id}">${r.read?'':'<i class="dot"></i>'}
-          <div><b>${r.type==='lots'?`🏗️ Liquidation report · ${r.lots.length} lot${r.lots.length===1?'':'s'}`:r.type==='move'?`🔀 Move ${esc(r.product)} → ${MKT_LABEL[r.market]}`:r.type==='products'&&r.hot?`🔥 Hot deal: ${esc(r.leads[0]?r.leads[0].name:'')}`:r.type==='products'&&r.restock?`🔁 Restock: ${esc(r.leads[0]?r.leads[0].name:'')}`:r.type==='products'&&r.watch?`👀 Price drop${r.leads.length>1?'s':''}: ${r.leads.length>1?r.leads.length+' products':esc(r.leads[0]?r.leads[0].name:'')}`:r.type==='products'&&r.digest?`📋 ${esc(r.from)}'s daily report · ${r.leads.length} deal${r.leads.length===1?'':'s'}${(r.moves||[]).length?` + ${r.moves.length} move${r.moves.length>1?'s':''}`:''}`:r.type==='products'?`📋 ${r.from&&r.from!=='Scout'?esc(r.from)+"'s deals":'Product report'} · ${r.leads.length} match${r.leads.length===1?'':'es'}`:r.type==='brief'?`🗂️ ${esc(r.from)}: ${esc(r.title||'Report')}`:'📊 '+esc(r.headline||('Day '+r.d.day+' money report'))}</b>
+        return `<div class="ritem${r.alert&&pend?' alert':''}" data-a="open" data-r="${r.id}">${r.read?'':'<i class="dot"></i>'}
+          <div><b>${r.type==='lots'?`🏗️ Liquidation report · ${r.lots.length} lot${r.lots.length===1?'':'s'}`:r.type==='move'?`🔀 Move ${esc(r.product)} → ${MKT_LABEL[r.market]}`:r.type==='products'&&r.hot?`🔥 Hot deal: ${esc(r.leads[0]?r.leads[0].name:'')}`:r.type==='products'&&r.restock?`${r.alert?'🚨 Restock alert':'🔁 Restock'}: ${esc(r.leads[0]?r.leads[0].name:'')}`:r.type==='products'&&r.watch?`👀 Price drop${r.leads.length>1?'s':''}: ${r.leads.length>1?r.leads.length+' products':esc(r.leads[0]?r.leads[0].name:'')}`:r.type==='products'&&r.digest?`📋 ${esc(r.from)}'s daily report · ${r.leads.length} deal${r.leads.length===1?'':'s'}${(r.moves||[]).length?` + ${r.moves.length} move${r.moves.length>1?'s':''}`:''}`:r.type==='products'?`📋 ${r.from&&r.from!=='Scout'?esc(r.from)+"'s deals":'Product report'} · ${r.leads.length} match${r.leads.length===1?'':'es'}`:r.type==='brief'?`🗂️ ${esc(r.from)}: ${esc(r.title||'Report')}`:'📊 '+esc(r.headline||('Day '+r.d.day+' money report'))}</b>
           <span class="mut">from ${r.from}${r.type==='lots'?` · Day ${r.day} · ${!r.lots.length?'nothing passed':r.lots.some(l=>!l.decision)?r.lots.filter(l=>!l.decision).length+' waiting on you':'all decided'}`:r.type==='products'?` · Day ${r.day} · ${!r.leads.length&&!(r.moves||[]).length?'nothing passed':pend?pend+' waiting on you':'all decided'}`:r.type==='move'?` · Day ${r.day} · ${r.decision?'decided':'waiting on you'}`:` · Day ${r.d?r.d.day:r.day}`}</span></div><span class="chev">›</span></div>`; }).join('')
         : ((G.pendings||[]).length?'':`<p class="mut center">No reports yet. Scout is reviewing today’s leads. Check back soon, or tap Scout if they're slacking! 🔍</p>`);
     }
@@ -1795,20 +1833,24 @@ function renderSheet(){
   } else if(tab==='products'){
     const label={order:'Waiting for Stocky to order',to3pl:'In transit to 3PL',at3pl:'At 3PL: needs a shipment / listing',toFBA:'In transit to Amazon (FBA)',toWFS:'In transit to Walmart (WFS)',live:'Live & selling',done:'Sold out',suppressed:'Suppressed (IP complaint)',moved:'Moved to another marketplace'};
     const pct={order:.05,to3pl:.25,at3pl:.45,toFBA:.65,toWFS:.65,live:.85,done:1,suppressed:1,moved:1};
-    h = G.purchases.length ? G.purchases.map(p=>{
+    const inMk=p=>invMk==='all'||(p.channel||'amazon')===invMk;
+    const list=invMk==='lots'?[]:G.purchases.filter(inMk);
+    h = invTabs() + (invMk==='lots'?'':invSummary(list)) + (invMk==='lots'?'':list.length ? list.map(p=>{
       const invested=p.qty*(p.cost+p.lead.prep), profit=p.net-invested;
       const L=p.comps&&p.comps.length?lowComp(p):Infinity;
       const ch=p.channel||'amazon';
       const extra = ['to3pl','toFBA','toWFS'].includes(p.stage) ? ` · ~${Math.max(0,p.t).toFixed(1)} days` : p.stage==='live' ? (ch==='amazon'?` · ${$$(p.price)} <span class="mut">(lowest offer ${isFinite(L)?$$(L):'none'})</span>`:` · ${$$(p.price)}${now()-(p.lastTended||0)>1.5?` <span class="r">${ch==='ebay'?'Eli':'Wally'} needs to tend listings</span>`:''}`) : '';
-      return `<div class="prod"><div class="lh"><b>${p.name}</b><span class="mut nowrap">${MKT_ICON[ch]} ${MKT_LABEL[ch]} · ${p.qty} units</span></div>
+      const sel=invOpen===p.id;
+      return `<div class="prod tap${sel?' sel':''}" data-a="inv" data-p="${p.id}"><div class="lh"><b>${p.name}</b><span class="mut nowrap">${MKT_ICON[ch]} ${MKT_LABEL[ch]} · ${p.qty} units</span></div>
         <div class="stage ${p.stage}">${p.stage==='live'?`Live on ${MKT_LABEL[ch]}`:label[p.stage]}${extra}</div>
         <div class="pbar"><i style="width:${pct[p.stage]*100}%" class="${p.stage}"></i></div>${p.walmart?`<div class="wm">🟦 Also on Walmart · ${p.walmart.sold} sold there</div>`:''}
         <div class="pr"><span>Sold <b>${p.sold}</b> · Left <b>${p.stock}</b></span><span>${profit>=0?`Profit <b class="g">${$0(profit)}</b>`:`Earned back <b>${$0(p.net)}</b> of ${$0(invested)}`}</span></div>
-        ${(p.notes||[]).slice(0,3).map(n=>`<div class="note"><b>${n.who}:</b> ${esc(n.text)} ${srcTag(n.src)}</div>`).join('')}</div>`; }).join('')
+        ${(p.notes||[]).slice(0,3).map(n=>`<div class="note"><b>${n.who}:</b> ${esc(n.text)} ${srcTag(n.src)}</div>`).join('')}${sel?invDetail(p):''}</div>`; }).join('')
       + (G.messages.some(m=>m.done)?`<h4>💬 Recent buyer messages</h4>`+G.messages.filter(m=>m.done).slice(-6).reverse().map(m=>`<div class="note msg"><b>Buyer (${esc(m.product)}):</b> “${esc(m.text)}”<br><b>${m.who}:</b> ${String(m.action).toUpperCase()}. “${esc(m.reply)}” ${srcTag(m.src)}${m.note?`<br><span class="r">${esc(m.note)}</span>`:''}</div>`).join(''):'')
-      : `<p class="mut center">No products yet. Approve leads from Scout's reports and they'll show up here as they move supplier → 3PL → Amazon.</p>`;
-    if(G.lots&&G.lots.length) h+=`<h4>🏗️ Liquidation lots</h4>`+G.lots.map(lotRow).join('');
-    h=winnersCard()+h+watchCard();
+      : `<p class="mut center">${invMk==='all'?"No products yet. Approve leads from Scout's reports and they'll show up here as they move supplier → 3PL → marketplace.":`Nothing on ${MKT_LABEL[invMk]} yet.`}</p>`);
+    if((invMk==='all'||invMk==='lots')&&G.lots&&G.lots.length) h+=`<h4>🏗️ Liquidation lots</h4>`+G.lots.map(lotRow).join('');
+    else if(invMk==='lots') h+=`<p class="mut center">No liquidation lots yet.</p>`;
+    if(invMk==='all') h=winnersCard()+h+watchCard();
   } else {
     const aiCard = `<div class="aicard ${G.aiOn&&AI?'on':''}"><div><b>🧠 AI brains: ${!aiReady?'checking…':!AI?'not available here':G.aiOn?'ON':'OFF'}</b>
       <span>${aiReady&&!AI?'Open this in the Claude app or on claude.ai to let agents think with Claude. Until then they use backup rules.':'When ON, every agent thinks with Claude: Scout picks products, Rex reads price charts, Ivy judges IP risk, Stocky writes POs, Lexi plans shipments, Penny sets prices, Hana answers buyers, Bea writes your report. It uses your Claude usage (<b>'+G.aiCalls+'</b> calls so far). When OFF, they follow simple backup rules.'}</span></div>
@@ -1850,7 +1892,14 @@ body.addEventListener('click',e=>{
     const open=r=> r.type==='products'?(r.leads.some(l=>!l.decision)||(r.moves||[]).some(v=>!v.decision)) : r.type==='lots'?r.lots.some(l=>!l.decision) : r.type==='move'?!r.decision : r.type==='daily'?dailies.includes(r) : !r.read;
     const before=G.reports.length; G.reports=G.reports.filter(open); log(`🧹 Cleared ${before-G.reports.length} finished report${before-G.reports.length===1?'':'s'}`); markSave(); updStats(); renderSheet(); return; }
   if(act==='unwatch'){ G.watch=(G.watch||[]).filter(w=>w.id!==+b.dataset.w); markSave(); renderSheet(); return; }
-  const rep=G.reports.find(r=>r.id===openRep); if(!rep) return;
+  if(act==='noop') return;
+  if(act==='invmk'){ invMk=b.dataset.m; invOpen=null; invRep=null; renderSheet(); body.scrollTop=0; return; }
+  if(act==='inv'){ const id=+b.dataset.p; if(invOpen===id) return; invOpen=id; if(!invRep||invRep.pid!==id) invRep=null; renderSheet(); return; }
+  if(act==='invrestock'||act==='invrescan'){ const p=P(+b.dataset.p); if(!p) return; invScanning=p.id; invRep=null; const y=body.scrollTop; renderSheet(); body.scrollTop=y;
+    setTimeout(()=>{ if(invScanning!==p.id) return; invScanning=null; const who=p.foundBy&&hiredA(p.foundBy)?p.foundBy:'scout';
+      const {l}=restockScan(p,who,true); invRep={id:-p.id, pid:p.id, type:'products', restock:true, manual:true, owner:who, from:l.scout.who, leads:[l]};
+      log(`🔁 You asked for a restock scan on ${p.name}`); const y2=body.scrollTop; renderSheet(); body.scrollTop=y2; },900); return; }
+  const rep=(tab==='products'&&invRep&&b.closest('.invscan'))?invRep:G.reports.find(r=>r.id===openRep); if(!rep) return;
   if(act==='lotbuy'||act==='lotskip'){ const lt=rep.lots.find(x=>x.id===+b.dataset.l); if(!lt||lt.decision) return; const y=body.scrollTop;
     if(act==='lotbuy') approveLot(rep,lt); else { lt.decision={skip:true}; markSave(); } renderSheet(); body.scrollTop=y; return; }
   if((act==='mvgo'||act==='mvskip')&&b.dataset.mv){ const mv=(rep.moves||[]).find(v=>v.id===+b.dataset.mv); if(!mv||mv.decision) return; const y=body.scrollTop;
