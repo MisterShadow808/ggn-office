@@ -162,6 +162,9 @@ pre{white-space:pre-wrap;word-break:break-word;background:#f6f1e4;border-radius:
 .unw{background:#eee6d3;width:26px;height:26px;padding:0;font-size:12px;border-radius:50%}
 .rtools{display:flex;gap:8px;justify-content:flex-end;margin-bottom:8px} .rtools button{padding:7px 10px;font-size:12px}
 .chip.big{display:inline-block;font-size:11px;margin-bottom:4px}
+.age{font-size:11px;color:#8a7f66;margin:4px 0}
+.pchg{background:#fff1d6;border:1px solid #e8c33a;border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.45;margin-top:8px}
+.chip.hot{background:#ffe2d6;color:#c5462a}
 header{padding-top:calc(9px + env(safe-area-inset-top))}
 footer{padding-bottom:calc(12px + env(safe-area-inset-bottom))}
 #sheetBody{padding-bottom:calc(30px + env(safe-area-inset-bottom))}
@@ -509,7 +512,7 @@ function makeCandidate(usedNames, forcedStore){
       complaintReports:Math.floor(rr2(2,10)), chatter:pick(['Several sellers say they got IP complaints after listing this','Brand is known to send complaints to resellers','Listing was suppressed for some sellers last month'])}
     : {brand:pick(['Generic / unbranded','Small private-label brand','Store-brand bundle','Unbranded import']),
       complaintReports:Math.random()<.3?1:0, chatter:pick(['No complaint reports found','One old, unconfirmed complaint report','Many resellers on the listing with no issues reported'])};
-  const lead={id:G.nid++, name, store:forcedStore||pickStore(), cost, buyBox, ourPrice, fba, prep, profit, roi:r2(profit/cost),
+  const lead={id:G.nid++, foundAt:now(), checkedAt:now(), name, store:forcedStore||pickStore(), cost, buyBox, ourPrice, fba, prep, profit, roi:r2(profit/cost),
     bsr, monthly, salesHist, sellers, amazon, share, volatile, ip, hist, offers, ipInfo, trueMonthly:monthly*rr2(.55,1.25), decision:null, qty:0};
   const avg=(salesHist[0]+salesHist[1]+salesHist[2])/3;
   lead.above=r2(above*100);
@@ -650,7 +653,7 @@ function recalcLead(l){
   l.markets.amazon.why=ruleWhy(l); l.markets.amazon.pass=!l.markets.amazon.why.length;
   for(const m of ['walmart','ebay']){ const x=l.markets[m]; x.why=(x.why||[]).filter(w=>w!=='ROI under 25%'); if(x.roi<.25) x.why.push('ROI under 25%'); x.pass=!x.why.length; }
   l.best=bestMarket(l); l.market=l.best||'amazon'; }
-function freshLead(snap){ const l=JSON.parse(JSON.stringify(snap)); l.id=G.nid++; l.decision=null; l.qty=0; delete l.rex; delete l.ivy; delete l.scout; l.ipFail=false; return l; }
+function freshLead(snap){ const l=JSON.parse(JSON.stringify(snap)); l.id=G.nid++; l.foundAt=now(); l.checkedAt=now(); delete l.hot; delete l.expiresAt; delete l.pendingChange; l.decision=null; l.qty=0; delete l.rex; delete l.ivy; delete l.scout; l.ipFail=false; return l; }
 function leadSnap(l){ const x=JSON.parse(JSON.stringify(l)); delete x.decision; delete x.rex; delete x.ivy; delete x.scout; return x; }
 function queueRestock(p){ if(!p.leadSnap||p.restockQueued) return; const profit=p.net-p.qty*(p.cost+p.lead.prep); if(profit<=0) return;
   p.restockQueued=true; const who=p.foundBy&&hiredA(p.foundBy)?p.foundBy:'scout';
@@ -677,18 +680,43 @@ function digestAdd(owner,leads){ const D=digestFor(owner), key=l=>l.name+'|'+l.s
 function sendDigest(owner,onDemand){
   const D=(G.digest||{})[owner]; const nm=(ROLES.find(r=>r.key===owner)||{name:'Scout'}).name;
   if(!D||(!D.leads.length&&!D.moves.length)){ if(onDemand) notify(`📋 ${nm}: nothing that passes your rules yet today. I'll keep looking.`); return null; }
-  const leads=D.leads.slice(0,5), extra=D.leads.length-leads.length;
+  let gone=0, nolonger=0, changed=0; const leads=[];
+  for(const l of D.leads){ if(leads.length>=5) break; const r=recheck(l);
+    if(r.gone){ gone++; continue; } if(r.changed){ changed++; if(!passesAny(l)){ nolonger++; continue; } } leads.push(l); }
+  leads.sort((a,b)=>bestROI(b)-bestROI(a));
+  const extra=Math.max(0,D.leads.length-gone-nolonger-leads.length);
+  if(!leads.length&&!D.moves.length){ delete G.digest[owner]; log(`🔍 ${nm} re-checked today's finds before sending: all sold out or changed (${gone} sold out, ${nolonger} no longer pass)`); if(onDemand) notify(`📋 ${nm}: today's finds all sold out or changed. Still looking!`); markSave(); return null; }
   const nR=leads.filter(l=>l.restock).length, nW=leads.filter(l=>l.watchHit).length;
   const parts=[]; if(leads.length) parts.push(`${leads.length} best deal${leads.length>1?'s':''} from ${D.checked} products checked`); if(nR) parts.push(`${nR} restock check${nR>1?'s':''}`); if(nW) parts.push(`${nW} price drop${nW>1?'s':''}`); if(D.moves.length) parts.push(`${D.moves.length} move suggestion${D.moves.length>1?'s':''}`);
   const rp={id:G.nid++, type:'products', digest:true, owner, from:nm, read:false, day:G.day, src:'rules', leads, moves:D.moves, checked:D.checked, fails:D.fails,
     removed:{...D.removed, rexOn:!!hiredA('rex'), ivyOn:!!hiredA('ivy')},
-    summary:`Today's report: ${parts.join(', ')}.${extra>0?` ${extra} more passed but didn't make the top 5.`:''} Highest ROI first.`};
+    summary:`Today's report: ${parts.join(', ')}.${extra>0?` ${extra} more passed but didn't make the top 5.`:''} I re-checked every price right before sending${gone||changed?`: ${[gone?gone+' sold out':'',changed?changed+' changed price':'',nolonger?nolonger+' no longer passed and were dropped':''].filter(Boolean).join(', ')}`:', and nothing changed'}. Highest ROI first.`};
   for(const r of G.reports) if(r.type==='products'&&r.digest&&r.owner===owner){   // yesterday's deals expire when the new report arrives
     for(const l of r.leads) if(!l.decision) l.decision={expired:true}; for(const v of (r.moves||[])) if(!v.decision) v.decision={expired:true}; r.read=true; }
   G.reports=G.reports.filter(r=>!(r.type==='products'&&r.digest&&r.owner===owner&&!r.leads.some(l=>l.decision&&l.decision.qty)&&!(r.moves||[]).some(v=>v.decision&&v.decision.moved)));
   G.reports.unshift(rp); trimReports(); delete G.digest[owner];
   notify(`📋 ${nm}'s daily report: ${parts.join(', ')}`); if(onDemand) openReportSoon(rp.id); markSave(); return rp; }
 function sendAllDigests(){ for(const owner of Object.keys(G.digest||{})) sendDigest(owner,false); }
+
+// ---------- freshness: hot-deal alerts, re-checks, deal age ----------
+const HOT={roi:1.5, profit:20, perDay:1, teamPerDay:2};   // practice thresholds: ROI ≥ 150% and profit ≥ $20/unit (or a watchlist price drop); max 1 per bot, 2 per day overall
+const isHot=l=>{ const x=l.best&&l.markets?l.markets[l.best]:null; return !!x && (l.watchHit || (x.roi>=HOT.roi && x.profit>=HOT.profit)); };
+function hotAllowed(owner){ const H=G.hot=G.hot||{}; const h=H[owner]; const team=Object.values(H).filter(x=>x&&x.day===G.day).reduce((a,x)=>a+x.n,0); return team<HOT.teamPerDay && (!h||h.day!==G.day||h.n<HOT.perDay); }
+function sendHot(owner,l){ const H=G.hot=G.hot||{}; if(!H[owner]||H[owner].day!==G.day) H[owner]={day:G.day,n:0}; H[owner].n++;
+  const nm=(ROLES.find(r=>r.key===owner)||{name:'Scout'}).name;
+  l.hot=true; l.expiresAt=now()+rr2(.25,.5); l.qty=l.qty||suggestQtyM(l,l.market);
+  const x=l.markets[l.best], hrs=Math.round((l.expiresAt-now())*24);
+  const rp={id:G.nid++, type:'products', hot:true, owner, from:nm, read:false, day:G.day, src:'rules', leads:[l], removed:null,
+    summary:`🔥 Hot deal${l.watchHit?' (price drop)':''}: ${l.name} at ${l.store} for ${$$(l.cost)}. ${Math.round(x.roi*100)}% ROI and ${$$(x.profit)} profit per unit on ${MKT_LABEL[l.best]}. Deals like this usually end within hours. This one may be gone in about ${hrs}h.`};
+  G.reports.unshift(rp); trimReports(); notify(`🔥 Hot deal from ${nm}: ${l.name}, ${Math.round(x.roi*100)}% ROI. Ends in ~${hrs}h`); markSave(); return rp; }
+function recheck(l){   // live price / stock check (older finds change more often)
+  const age=Math.max(0,now()-(l.checkedAt||l.foundAt||now()));
+  if(Math.random()<Math.min(.35,age*.35)){ l.checkedAt=now(); return {gone:true}; }
+  if(Math.random()<Math.min(.6,.05+age*.7)){ const old=l.cost; l.cost=r2(l.cost*(Math.random()<.65?rr2(1.03,1.15):rr2(.9,.98))); const m=l.market; recalcLead(l); if(l.markets[m]) l.market=m; l.checkedAt=now(); return {changed:true, old}; }
+  l.checkedAt=now(); return {same:true}; }
+function ago(t){ if(t==null) return '—'; const h=(now()-t)*24; return h<.25?'just now':h<1?Math.round(h*60)+'m ago':h<36?Math.round(h)+'h ago':Math.round(h/24)+'d ago'; }
+function expireHot(){ for(const r of G.reports) if(r.hot) for(const l of r.leads) if(!l.decision&&now()>l.expiresAt){ l.decision={expired:true,gone:true}; r.endedAt=now(); r.read=true; log(`⌛ Hot deal ended: ${l.name}`); }
+  const n=G.reports.length; G.reports=G.reports.filter(r=>!(r.hot&&r.endedAt&&now()-r.endedAt>1)); if(G.reports.length!==n) updStats(); }
 
 // ================= task handlers =================
 // task = {kind, title, dur, ref?, data?}   (transient runtime fields live under task._)
@@ -841,7 +869,7 @@ const TASKS={
         w.lead.cost=r2(w.lead.cost*(Math.random()<.1?rr2(.85,.95):rr2(.98,1.03)));
         if(w.lead.cost<=w.target){ const l=freshLead(w.lead); recalcLead(l);
           if(passesAny(l)){ W.splice(W.indexOf(w),1); l.scout={verdict:'recommend',src:'rules',who:'Scout',note:`Fell to ${$$(l.cost)} at ${l.store} (was ${$$(w.was)}, target ${$$(w.target)}). Now best on ${MKT_LABEL[l.best]} at ${Math.round(l.markets[l.best].roi*100)}% ROI.`}; l.qty=suggestQtyM(l,l.market); hits.push(l); } } }
-      if(hits.length){ hits.forEach(l=>l.watchHit=true); digestAdd('scout',hits); log(`👀 ${hits.length} watched product${hits.length>1?'s':''} dropped in price (added to Scout's report)`); }
+      if(hits.length){ hits.forEach(l=>l.watchHit=true); const hotNow=hits.filter((l,i)=>i<1&&hotAllowed('scout')); hotNow.forEach(l=>sendHot('scout',l)); digestAdd('scout',hits.filter(l=>!hotNow.includes(l))); log(`👀 ${hits.length} watched product${hits.length>1?'s':''} dropped in price (added to Scout's report)`); }
       markSave(); }},
   wmlist:{
     parse(){ throw 0; }, fallback(){ return {}; },
@@ -884,7 +912,9 @@ function nextCheck(pr){
   const D=digestFor(owner); D.checked+=pr.checked||0;
   for(const [k,v] of Object.entries(pr.fails||{})) D.fails[k]=(D.fails[k]||0)+v;
   if(pr.removed){ D.removed.ip+=pr.removed.ip||0; D.removed.unstable+=pr.removed.unstable||0; }
-  digestAdd(owner,pr.leads);
+  const hotNow=[]; for(const l of pr.leads) if(isHot(l)&&hotAllowed(owner)&&hotNow.length<1) hotNow.push(l);
+  for(const l of hotNow) sendHot(owner,l);
+  digestAdd(owner,pr.leads.filter(l=>!hotNow.includes(l)));
   if(pr.onDemand) sendDigest(owner,true);
   else log(`🔍 ${nm} checked ${pr.checked} products${pr.source?' on '+pr.source:''}: ${pr.leads.length?pr.leads.length+' passed (saved for today’s report)':'nothing passed'}`);
   markSave();
@@ -1082,6 +1112,7 @@ function simBusiness(dt){
     }
   }
   simLots(dd);
+  expireHot();
   if(G.time>=1){ G.time-=1; endOfDay(); }
   if(hiredA('liq') && !G.lotHunting && !G.reports.some(r=>r.type==='lots'&&r.lots.some(l=>!l.decision)) && now()>=(G.nextLotHuntAt||0)){ G.lotHunting=true; G.nextLotHuntAt=now()+1.5; queueTask('liq',{kind:'lots',title:'Check liquidation lots',dur:12}); }
   { const sc=hiredA('scout'); if(sc && !G.hunting && sc.state==='ready' && !sc.queue.length && now()>=(G.nextHuntAt||0)) queueHunt(); }
@@ -1518,13 +1549,13 @@ function leadCard(rep,l){
   if(!l.markets) addMarkets(l);
   const r=l.rules, sc=l.scout||{note:''}, m=l.market||l.best||'amazon';
   const warn = l.ipFail ? ['bad','⛔ Fails IP rule'] : (l.rex&&!l.rex.stable) ? ['warn','⚠️ Price unstable'] : passesAny(l) ? ['ok',`✅ Best: ${MKT_LABEL[l.best]}`] : ['bad','Fails rules'];
-  const dec = l.decision ? (l.decision.expired ? `<div class="dec skip">Expired: replaced by a newer daily report</div>` : l.decision.skip ? `<div class="dec skip">Skipped</div>` : `<div class="dec buy">✅ Approved ${l.decision.qty} units for ${MKT_LABEL[l.decision.market||'amazon']} · ${$0(l.decision.qty*l.cost)}</div>`) : '';
+  const dec = l.decision ? (l.decision.gone ? `<div class="dec skip">${l.hot&&l.decision.expired?'⌛ Deal ended: the store ran out or the price went back up':'🚫 Sold out at the store before you bought'}</div>` : l.decision.expired ? `<div class="dec skip">Expired: replaced by a newer daily report</div>` : l.decision.skip ? `<div class="dec skip">Skipped</div>` : `<div class="dec buy">✅ Approved ${l.decision.qty} units for ${MKT_LABEL[l.decision.market||'amazon']} · ${$0(l.decision.qty*l.cost)}</div>`) : '';
   const afford=maxAfford(l);
   const rex = l.rex ? `<div class="say"><b>Rex:</b> ${l.rex.stable?'✅ Stable.':'⚠️ Unstable.'} ${esc(l.rex.note)} ${srcTag(l.rex.src)}</div>` : '';
   const ivy = l.ivy ? `<div class="say"><b>Ivy:</b> ${l.ivy.risk==='low'?'✅':l.ivy.risk==='medium'?'🟡':'⛔'} ${l.ivy.risk} IP risk. ${esc(l.ivy.note)} ${srcTag(l.ivy.src)}</div>` : '';
   return `<div class="lead ${l.decision?'decided':''}">
     <div class="lh"><b>${l.name}</b><span class="tag ${warn[0]}">${warn[1]}</span></div>
-    ${l.restock?'<div class="chip big">🔁 Restock check</div>':''}${l.watchHit?'<div class="chip big">👀 Price drop on your watchlist</div>':''}
+    ${l.hot&&!l.decision?`<div class="chip big hot">🔥 Hot deal · ends in ~${Math.max(0,Math.round((l.expiresAt-now())*24))}h</div>`:''}${l.restock?'<div class="chip big">🔁 Restock check</div>':''}${l.watchHit?'<div class="chip big">👀 Price drop on your watchlist</div>':''}
     <div class="src">Buy at <b>${esc(l.store)}</b> for <b>${$$(l.cost)}</b>${isWinnerStore(l.store)?' <span class="chip">⭐ proven store</span>':''}${pastWinner(l)?' <span class="chip">🏆 past winner</span>':''}${l.decision?'':' · <span class="mut">tap a marketplace to choose where it sells</span>'}</div>
     ${srcTable(l)}${mktTable(l)}
     <div class="amzline">📦 Amazon: BSR #${l.bsr.toLocaleString()} · sales ${(l.salesHist||[l.monthly]).join(' → ')}/mo · ${l.sellers} FBA sellers · Buy Box ${$$(l.buyBox)}</div>
@@ -1535,12 +1566,15 @@ function leadCard(rep,l){
       <div>${ck(l.ivy?l.ivy.risk==='low':0,!l.ivy)} Low IP risk ${l.ivy?'':'<i>(hire Ivy)</i>'}</div>
     </div>
     <div class="say"><b>${esc(sc.who||rep.from||'Scout')}:</b> ${esc(sc.note)} ${srcTag(sc.src)}</div>${rex}${ivy}
-    ${dec || `<div class="buyrow">
+    <div class="age">🕒 Found ${ago(l.foundAt)} · price checked ${ago(l.checkedAt)}</div>
+    ${!dec&&l.pendingChange?`<div class="pchg">⚠️ <b>Price changed</b> since this deal was found: ${$$(l.pendingChange.old)} → <b>${$$(l.cost)}</b> (${l.cost>l.pendingChange.old?'▲ up':'▼ down'} ${$$(Math.abs(l.cost-l.pendingChange.old))}). On ${MKT_LABEL[m]} the ROI is now <b>${Math.round(l.markets[m].roi*100)}%</b> (${$$(l.markets[m].profit)}/unit) ${l.markets[m].pass?'✓ still meets your rules':'✗ no longer meets your rules'}.</div>
+      <div class="buyrow"><div class="cost">${$0(l.qty*l.cost)}<span>${l.qty} units</span></div><button class="skipb" data-a="skip" data-l="${l.id}">Skip</button><button class="buyb" data-a="buyconfirm" data-l="${l.id}" ${l.qty<1||l.qty*l.cost>G.cash?'disabled':''}>Buy at ${$$(l.cost)}</button></div>`:''}
+    ${dec || (l.pendingChange?'':`<div class="buyrow">
       <div class="step"><button data-a="minus" data-l="${l.id}">−</button><b>${l.qty}</b><button data-a="plus" data-l="${l.id}">+</button></div>
       <div class="cost">${$0(l.qty*l.cost)}<span>max ${afford}</span></div>
       <button class="skipb" data-a="skip" data-l="${l.id}">Skip</button>
       <button class="buyb" data-a="buy" data-l="${l.id}" ${l.qty<1||l.qty*l.cost>G.cash?'disabled':''}>Approve · ${MKT_LABEL[m]}</button></div>
-      ${l.markets[m].pass?'':`<div class="say">⚠️ ${MKT_LABEL[m]} doesn't meet your rules for this product (${esc(l.markets[m].why.join(', '))}). You can still choose it.</div>`}`}
+      ${l.markets[m].pass?'':`<div class="say">⚠️ ${MKT_LABEL[m]} doesn't meet your rules for this product (${esc(l.markets[m].why.join(', '))}). You can still choose it.</div>`}`)}
   </div>`;
 }
 function lotCard(rep,l){
@@ -1614,7 +1648,7 @@ function reportView(rep){
     <h3>📋 ${esc(rep.title||'Report')}</h3><p class="mut">Day ${rep.day} · from ${rep.from}, ${rep.role} ${srcTag(rep.src)}</p>
     <div class="say big">${esc(rep.summary)}</div>${rep.bullets&&rep.bullets.length?`<ul class="tips">${rep.bullets.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}`;
   if(rep.type==='products') return `<button class="back" data-a="back">‹ All reports</button>
-    <h3>${rep.digest?'📋 Daily report':rep.restock?'🔁 Restock check':rep.watch?'👀 Price-drop alert':'📋 Product report'} from ${esc(rep.from||'Scout')}</h3>
+    <h3>${rep.hot?'🔥 Hot deal':rep.digest?'📋 Daily report':rep.restock?'🔁 Restock check':rep.watch?'👀 Price-drop alert':'📋 Product report'} from ${esc(rep.from||'Scout')}</h3>
     <p class="mut">Day ${rep.day}${rep.checked&&!rep.restock&&!rep.watch?` · Checked <b>${rep.checked}</b> products${rep.source?` on ${esc(rep.source)}`:''}, <b>${rep.leads.length}</b> met the rules on at least one marketplace`:''}${rep.leads.some(l=>l.rex)?' · Rex checked price history':''}${rep.leads.some(l=>l.ivy)?' · Ivy checked IP risk':''}. Nothing is bought until you approve. Highest ROI first.</p>
     ${rep.removed&&(rep.removed.ip||rep.removed.unstable)?`<div class="say">🧹 Screened out: ${rep.removed.ip?`<b>${rep.removed.ip}</b> IP-risky (Ivy)`:''}${rep.removed.ip&&rep.removed.unstable?' · ':''}${rep.removed.unstable?`<b>${rep.removed.unstable}</b> price-unstable (Rex)`:''}</div>`:''}
     ${rep.removed&&(!rep.removed.rexOn||!rep.removed.ivyOn)?`<div class="say">⚠️ ${!rep.removed.rexOn&&!rep.removed.ivyOn?'Hire <b>Rex</b> and <b>Ivy</b>':!rep.removed.rexOn?'Hire <b>Rex</b>':'Hire <b>Ivy</b>'} in the Team tab so unstable-price and IP-risky products get removed automatically.</div>`:''}
@@ -1681,7 +1715,7 @@ function renderSheet(){
       h += G.reports.length ? G.reports.map(r=>{
         const pend = r.type==='products' ? r.leads.filter(l=>!l.decision).length+(r.moves||[]).filter(v=>!v.decision).length : 0;
         return `<div class="ritem" data-a="open" data-r="${r.id}">${r.read?'':'<i class="dot"></i>'}
-          <div><b>${r.type==='lots'?`🏗️ Liquidation report · ${r.lots.length} lot${r.lots.length===1?'':'s'}`:r.type==='move'?`🔀 Move ${esc(r.product)} → ${MKT_LABEL[r.market]}`:r.type==='products'&&r.restock?`🔁 Restock: ${esc(r.leads[0]?r.leads[0].name:'')}`:r.type==='products'&&r.watch?`👀 Price drop${r.leads.length>1?'s':''}: ${r.leads.length>1?r.leads.length+' products':esc(r.leads[0]?r.leads[0].name:'')}`:r.type==='products'&&r.digest?`📋 ${esc(r.from)}'s daily report · ${r.leads.length} deal${r.leads.length===1?'':'s'}${(r.moves||[]).length?` + ${r.moves.length} move${r.moves.length>1?'s':''}`:''}`:r.type==='products'?`📋 ${r.from&&r.from!=='Scout'?esc(r.from)+"'s deals":'Product report'} · ${r.leads.length} match${r.leads.length===1?'':'es'}`:r.type==='brief'?`🗂️ ${esc(r.from)}: ${esc(r.title||'Report')}`:'📊 '+esc(r.headline||('Day '+r.d.day+' money report'))}</b>
+          <div><b>${r.type==='lots'?`🏗️ Liquidation report · ${r.lots.length} lot${r.lots.length===1?'':'s'}`:r.type==='move'?`🔀 Move ${esc(r.product)} → ${MKT_LABEL[r.market]}`:r.type==='products'&&r.hot?`🔥 Hot deal: ${esc(r.leads[0]?r.leads[0].name:'')}`:r.type==='products'&&r.restock?`🔁 Restock: ${esc(r.leads[0]?r.leads[0].name:'')}`:r.type==='products'&&r.watch?`👀 Price drop${r.leads.length>1?'s':''}: ${r.leads.length>1?r.leads.length+' products':esc(r.leads[0]?r.leads[0].name:'')}`:r.type==='products'&&r.digest?`📋 ${esc(r.from)}'s daily report · ${r.leads.length} deal${r.leads.length===1?'':'s'}${(r.moves||[]).length?` + ${r.moves.length} move${r.moves.length>1?'s':''}`:''}`:r.type==='products'?`📋 ${r.from&&r.from!=='Scout'?esc(r.from)+"'s deals":'Product report'} · ${r.leads.length} match${r.leads.length===1?'':'es'}`:r.type==='brief'?`🗂️ ${esc(r.from)}: ${esc(r.title||'Report')}`:'📊 '+esc(r.headline||('Day '+r.d.day+' money report'))}</b>
           <span class="mut">from ${r.from}${r.type==='lots'?` · Day ${r.day} · ${!r.lots.length?'nothing passed':r.lots.some(l=>!l.decision)?r.lots.filter(l=>!l.decision).length+' waiting on you':'all decided'}`:r.type==='products'?` · Day ${r.day} · ${!r.leads.length&&!(r.moves||[]).length?'nothing passed':pend?pend+' waiting on you':'all decided'}`:r.type==='move'?` · Day ${r.day} · ${r.decision?'decided':'waiting on you'}`:` · Day ${r.d?r.d.day:r.day}`}</span></div><span class="chev">›</span></div>`; }).join('')
         : ((G.pendings||[]).length?'':`<p class="mut center">No reports yet. Scout is reviewing today’s leads. Check back soon, or tap Scout if they're slacking! 🔍</p>`);
     }
@@ -1754,8 +1788,14 @@ body.addEventListener('click',e=>{
   const afford=Math.floor(Math.max(0,G.cash)/l.cost);
   if(act==='minus'){ l.qty=Math.max(0,l.qty-(l.qty>20?5:1)); }
   if(act==='plus'){ l.qty=Math.min(afford,l.qty+(l.qty>=20?5:1)); }
-  if(act==='skip'){ skip(rep,l); return; }
-  if(act==='buy'){ const y=body.scrollTop; approve(rep,l,l.qty); body.scrollTop=y; return; }
+  if(act==='skip'){ delete l.pendingChange; skip(rep,l); return; }
+  if(act==='buy'){ const y=body.scrollTop;
+    if(l.hot&&now()>l.expiresAt){ l.decision={expired:true,gone:true}; markSave(); renderSheet(); body.scrollTop=y; return; }
+    const r=recheck(l);
+    if(r.gone){ l.decision={gone:true}; log(`🚫 ${l.name} sold out at ${l.store} before you bought`); markSave(); renderSheet(); body.scrollTop=y; return; }
+    if(r.changed){ l.pendingChange={old:r.old}; l.qty=Math.min(l.qty,maxAfford(l)); renderSheet(); body.scrollTop=y; return; }
+    approve(rep,l,l.qty); body.scrollTop=y; return; }
+  if(act==='buyconfirm'){ const y=body.scrollTop; delete l.pendingChange; approve(rep,l,l.qty); body.scrollTop=y; return; }
   const y=body.scrollTop; renderSheet(); body.scrollTop=y;
 });
 btnWhistle.onclick=()=>{ let n=0; agents.forEach(a=>{ if(isSlacking(a)&&a.queue.length&&sendToWork(a,true)) n++; });
@@ -1777,7 +1817,7 @@ async function toggleAI(){
 // ================= start =================
 const appEl=document.getElementById('app'); appEl.addEventListener('scroll',()=>{appEl.scrollTop=0;appEl.scrollLeft=0;}); window.addEventListener('scroll',()=>window.scrollTo(0,0));
 resize(); updStats(); boot();
-window.__ggn={ purchases:()=>G.purchases.map(p=>({name:p.name,ch:p.channel,stage:p.stage,sold:p.sold,stock:p.stock})), reports:()=>G.reports.map(r=>({type:r.type,from:r.from,n:(r.leads||r.lots||[]).length})), pos:()=>agents.map(a=>({key:a.key,state:a.state,x:offX+a.hx*scale,y:offY+(a.hy+30)*scale})), leads:()=>G.reports.filter(r=>r.type==='products').map(r=>r.leads.map(l=>({from:r.from,pass:passesAny(l),best:l.best,market:l.market,roi:l.roi,ivy:l.ivy&&l.ivy.risk,rex:l.rex&&l.rex.stable}))), removed:()=>G.reports.filter(r=>r.type==='products').map(r=>r.removed)};
+window.__ggn={purchases:()=>G.purchases.map(p=>({name:p.name,ch:p.channel,stage:p.stage,sold:p.sold,stock:p.stock})), reports:()=>G.reports.map(r=>({type:r.type,from:r.from,n:(r.leads||r.lots||[]).length})), pos:()=>agents.map(a=>({key:a.key,state:a.state,x:offX+a.hx*scale,y:offY+(a.hy+30)*scale})), leads:()=>G.reports.filter(r=>r.type==='products').map(r=>r.leads.map(l=>({from:r.from,pass:passesAny(l),best:l.best,market:l.market,roi:l.roi,ivy:l.ivy&&l.ivy.risk,rex:l.rex&&l.rex.stable}))), removed:()=>G.reports.filter(r=>r.type==='products').map(r=>r.removed)};
 let last=performance.now();
 function loop(nowT){ const dt=Math.min(.05,(nowT-last)/1000); last=nowT; step(dt); render(); updClock(); requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
