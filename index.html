@@ -161,7 +161,7 @@ html,body{overscroll-behavior:none;-webkit-user-select:none;user-select:none;-we
       <button id="navProd">📦 Stock</button>
       <button id="navTeam">👥 Team</button>
       <button id="navAI" style="display:none">🧠 AI</button>
-      <button id="btnWhistle" class="alt">📣</button>
+      <button id="btnWhistle" class="alt" style="display:none">📣</button>
     </div>
   </footer>
   <div id="sheet">
@@ -415,14 +415,13 @@ const GOSSIP=["Did you see that ROI? 👀","Scout's leads are 🔥 today","Penny
 let agents=[];
 function makeAgent(idx, queue=[]){
   const r=ROLES[idx], seatCell=seats[idx];
-  const free=spots.filter(s=>!agents.some(o=>o.spot===s)), s=pick(free);
   return {...r, i:idx, station:'C0'+(idx+1), skin:SKIN[idx], seatCell, seat:{cx:seatCell[0]+.5, cy:seatCell[1]+.5},
-    x:s.cx, y:s.cy, spot:s, state:'idle', path:[], next:null, queue, task:null, prog:0,
+    x:seatCell[0]+.5, y:seatCell[1]+.5, spot:null, state:'ready', path:[], next:null, queue, task:null, prog:0,
     idleT:3+Math.random()*5, wanderT:5+Math.random()*6, bubble:null, bubbleT:0, bob:Math.random()*6, done:0};
 }
 const boss={name:'Royce', role:'CEO', boss:true, shirt:'#26324f', hair:'#121212', style:'short', skin:'#c68a5e', x:5.5, y:.6, state:'boss', bob:0, hx:0, hy:0};
 const hiredA = key => agents.find(a=>a.key===key);
-const isSlacking = a => a.state==='idle' || (a.state==='walk' && a.next==='idle');
+const isSlacking = a => false;   // bots work 24/7: no breaks
 
 // ================= state =================
 const DAY=45;
@@ -633,6 +632,13 @@ function nextCheck(){
   pr.rexDone=true;
   if(!pr.ivyDone && hiredA('ivy')) return queueTask('ivy',{kind:'ip',title:'Check IP risk',dur:7});
   pr.ivyDone=true;
+  const passed=pr.leads.length;
+  const ipOut=pr.leads.filter(l=>l.ivy&&l.ivy.risk!=='low').length;
+  const unstOut=pr.leads.filter(l=>!(l.ivy&&l.ivy.risk!=='low')&&l.rex&&!l.rex.stable).length;
+  pr.leads=pr.leads.filter(l=>!(l.ivy&&l.ivy.risk!=='low') && !(l.rex&&!l.rex.stable)).sort((a,b)=>b.roi-a.roi);
+  pr.removed={ip:ipOut, unstable:unstOut, rexOn:!!hiredA('rex'), ivyOn:!!hiredA('ivy')};
+  if(passed && !pr.leads.length) pr.summary=`${passed} product${passed>1?'s':''} passed your buy rules, but ${[ipOut?ipOut+' had IP risk (Ivy)':'',unstOut?unstOut+' had unstable prices (Rex)':''].filter(Boolean).join(' and ')}, so I removed them. Nothing to buy this round.`;
+  else if(pr.leads.length) pr.summary=`${pr.leads.length} product${pr.leads.length>1?'s':''} passed every rule${ipOut||unstOut?` after removing ${[ipOut?ipOut+' IP-risky':'',unstOut?unstOut+' price-unstable':''].filter(Boolean).join(' and ')}`:''}. Sorted by highest ROI first.`;
   G.reports.unshift({...pr, type:'products', from:'Scout', read:false}); trimReports();
   G.pendingReport=null; G.hunting=false;
   notify(pr.leads.length?`📋 Scout found ${pr.leads.length} product${pr.leads.length>1?'s':''} that meet your requirements`:`📋 Scout checked ${pr.checked} products: none met your requirements today`);
@@ -885,13 +891,10 @@ function step(rdt){
       a.prog=Math.min(waitingAI?.93:1, a.prog+dt/a.task.dur);
       if(waitingAI && a.prog>=.93 && !a.bubble){ a.bubble='🧠 thinking…'; a.bubbleT=1.4; }
       if(a.prog>=1){ finishTask(a); a.task=null;
-        if(a.queue.length && Math.random()<.55){ a.task=a.queue.shift(); a.prog=0; a.bubble='Next one! 💪'; a.bubbleT=1.5; startTask(a); }
-        else { a.bubble=pick(["Done! Break time ☕","Nailed it 😎","Ping pong anyone?","Water break 💧"]); a.bubbleT=2.2; goOnBreak(a,true); } }
-    } else if(a.state==='idle'){
-      a.idleT-=dt; a.wanderT-=dt;
-      if(!a.bubble && Math.random()<dt*.18 && agents.some(o=>o!==a && o.state==='idle' && Math.hypot(o.x-a.x,o.y-a.y)<3.2)){ a.bubble=pick(GOSSIP); a.bubbleT=3.4; }
-      if(a.idleT<=0 && a.queue.length && Math.random()<dt*.3){ a.bubble="Fine… I'll go work 🙄"; a.bubbleT=2; sendToWork(a,false); }
-      else if(a.wanderT<=0) goOnBreak(a);
+        if(a.queue.length){ a.task=a.queue.shift(); a.prog=0; startTask(a); } else a.state='ready'; }
+    } else {   // 'ready': sitting at the desk, starts the next task the moment one arrives
+      a.x=a.seat.cx; a.y=a.seat.cy;
+      if(a.queue.length){ a.task=a.queue.shift(); a.prog=0; a.state='work'; startTask(a); }
     }
   }
   leaderboard=[...agents].sort((p,q)=>q.done-p.done);
@@ -1030,7 +1033,7 @@ function drawFloor(){
 
 // ================= drawing: people =================
 function drawPerson(a){
-  const walking=a.state==='walk', working=a.state==='work'||a.boss, sitting=working || (a.state==='idle'&&a.spot&&a.spot.sit);
+  const walking=a.state==='walk', working=a.state==='work'||a.boss, sitting=working || a.state==='ready' || (a.state==='idle'&&a.spot&&a.spot.sit);
   const [px,py]=iso(a.x,a.y);
   ctx.fillStyle='rgba(0,0,0,.16)'; ctx.beginPath(); ctx.ellipse(px,py,10,5,0,0,7); ctx.fill();
   if(a===selected){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(px,py,14,7,0,0,7); ctx.stroke(); }
@@ -1064,7 +1067,7 @@ function drawPerson(a){
   ctx.fillStyle='#222'; ctx.fillRect(px-4,base-32,2,2.6); ctx.fillRect(px+2,base-32,2,2.6);
   ctx.fillStyle='rgba(230,110,110,.35)'; ctx.fillRect(px-7,base-29,3,2); ctx.fillRect(px+4,base-29,3,2);
   // headset (working)
-  if(working && !a.boss){ ctx.strokeStyle='#2f6fd1'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(px,base-34,10,Math.PI*1.08,Math.PI*1.92); ctx.stroke();
+  if((working||a.state==='ready') && !a.boss){ ctx.strokeStyle='#2f6fd1'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(px,base-34,10,Math.PI*1.08,Math.PI*1.92); ctx.stroke();
     ctx.fillStyle='#2f6fd1'; rr(px+7.5,base-36,4,6,2); ctx.fill(); rr(px-11.5,base-36,4,6,2); ctx.fill();
     ctx.strokeStyle='#2f6fd1'; ctx.lineWidth=1.3; ctx.beginPath(); ctx.moveTo(px+9,base-30); ctx.quadraticCurveTo(px+8,base-26,px+3,base-26); ctx.stroke(); }
   // props on break
@@ -1144,7 +1147,7 @@ function drawOverlays(people){
   for(const a of people){
     const sx=offX+a.hx*scale, sy=offY+a.hy*scale;
     if(sx<-60||sx>viewW+60||sy<-40||sy>viewH+60) continue;
-    const st=a.boss?['CEO','#8a5cf0']: a.state==='work'?['working','#36b37e']: isSlacking(a)?['on break','#e8833a']:['heading to desk','#3d6cf0'];
+    const st=a.boss?['CEO','#8a5cf0']: a.state==='work'?['working','#36b37e']:['standing by','#9aa3ad'];
     let topY=sy, w;
     if(big){ w=pill(sx,sy,a.name,null,a.shirt); pill(sx,sy-21,st[0],st[1]); topY=sy-21; }
     else w=pill(sx,sy,a.name,st[1]);
@@ -1168,6 +1171,7 @@ function updateCard(){
   let html;
   if(a.boss) html=`<div class="st">Director's Office</div><div class="nm">Royce · CEO</div><div class="ln">Approves every purchase 👀</div>`;
   else if(a.state==='work' && a.task) html=`<div class="st">Station ${a.station}</div><div class="nm">${a.name} · ${a.role}</div><div class="ln">${a.task._&&a.task._.ai==='pending'?'🧠 ':''}${esc(a.task.title)}</div><div class="bar"><i style="width:${Math.round(a.prog*100)}%"></i></div>${a.queue.length?`<div class="nm" style="margin-top:4px">${a.queue.length} more waiting</div>`:''}`;
+  else if(a.state==='ready') html=`<div class="st">Station ${a.station}</div><div class="nm">${a.name} · ${a.role}</div><div class="ln">Standing by: no tasks right now</div>`;
   else if(isSlacking(a)) html=`<div class="st">${a.name} · on break</div><div class="nm">${a.role}</div><div class="ln">${a.queue.length?a.queue.length+' task'+(a.queue.length>1?'s':'')+' waiting!':'No tasks right now'}</div>`;
   else html=`<div class="st">Station ${a.station}</div><div class="nm">${a.name} · ${a.role}</div><div class="ln">Heading to desk → ${a.task?esc(a.task.title):''}</div>`;
   if(cardInfo._h!==html){ cardInfo.innerHTML=html; cardInfo._h=html; }
@@ -1303,7 +1307,9 @@ function reportView(rep){
     <div class="say big">${esc(rep.summary)}</div>${rep.bullets&&rep.bullets.length?`<ul class="tips">${rep.bullets.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}`;
   if(rep.type==='products') return `<button class="back" data-a="back">‹ All reports</button>
     <h3>📋 Product report from Scout</h3>
-    <p class="mut">Day ${rep.day}${rep.checked?` · Checked <b>${rep.checked}</b> products, <b>${rep.leads.length}</b> met every requirement`:''}${rep.leads.some(l=>l.rex)?' · Rex checked price history':''}${rep.leads.some(l=>l.ivy)?' · Ivy checked IP risk':''}. Nothing is bought until you approve.</p>
+    <p class="mut">Day ${rep.day}${rep.checked?` · Checked <b>${rep.checked}</b> products, <b>${rep.leads.length}</b> met every requirement`:''}${rep.leads.some(l=>l.rex)?' · Rex checked price history':''}${rep.leads.some(l=>l.ivy)?' · Ivy checked IP risk':''}. Nothing is bought until you approve. Highest ROI first.</p>
+    ${rep.removed&&(rep.removed.ip||rep.removed.unstable)?`<div class="say">🧹 Screened out: ${rep.removed.ip?`<b>${rep.removed.ip}</b> IP-risky (Ivy)`:''}${rep.removed.ip&&rep.removed.unstable?' · ':''}${rep.removed.unstable?`<b>${rep.removed.unstable}</b> price-unstable (Rex)`:''}</div>`:''}
+    ${rep.removed&&(!rep.removed.rexOn||!rep.removed.ivyOn)?`<div class="say">⚠️ ${!rep.removed.rexOn&&!rep.removed.ivyOn?'Hire <b>Rex</b> and <b>Ivy</b>':!rep.removed.rexOn?'Hire <b>Rex</b>':'Hire <b>Ivy</b>'} in the Team tab so unstable-price and IP-risky products get removed automatically.</div>`:''}
     <details class="reqs"><summary>Your requirements (checked by code, not guesses)</summary><ul>
       <li>BSR 100,000 or better</li><li>Amazon not selling on the listing</li><li>At least 2 FBA sellers</li><li>Your price ≤ 3% over the Buy Box</li><li>ROI 25% or more</li>
       <li>Sales history steady (last month ≥ 70% of 3-month average)</li><li>No IP problems (Ivy)</li><li>Quantity ≈ 1 month of your share (last month's sales ÷ (FBA sellers + 1)), max 35% of cash</li></ul>
@@ -1439,7 +1445,7 @@ async function toggleAI(){
 // ================= start =================
 const appEl=document.getElementById('app'); appEl.addEventListener('scroll',()=>{appEl.scrollTop=0;appEl.scrollLeft=0;}); window.addEventListener('scroll',()=>window.scrollTo(0,0));
 resize(); updStats(); boot();
-window.__ggn={pos:()=>agents.map(a=>({key:a.key,state:a.state,x:offX+a.hx*scale,y:offY+(a.hy+30)*scale})), leads:()=>G.reports.filter(r=>r.type==='products').flatMap(r=>r.leads.map(l=>({name:l.name,pass:passesAll(l),rules:l.rules})))};
+window.__ggn={pos:()=>agents.map(a=>({key:a.key,state:a.state,x:offX+a.hx*scale,y:offY+(a.hy+30)*scale})), leads:()=>G.reports.filter(r=>r.type==='products').map(r=>r.leads.map(l=>({pass:passesAll(l),roi:l.roi,ivy:l.ivy&&l.ivy.risk,rex:l.rex&&l.rex.stable}))), removed:()=>G.reports.filter(r=>r.type==='products').map(r=>r.removed)};
 let last=performance.now();
 function loop(nowT){ const dt=Math.min(.05,(nowT-last)/1000); last=nowT; step(dt); render(); updClock(); requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
