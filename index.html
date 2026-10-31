@@ -1453,7 +1453,14 @@ requestAnimationFrame(loop);
 })();
 </script>
 <script>
-if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')) navigator.serviceWorker.register('sw.js').catch(()=>{});
+// Auto-update: when a newer version is published, reload into it (the game saves first via pagehide).
+if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){
+  const hadController=!!navigator.serviceWorker.controller; let reloading=false;
+  navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(reg=>{
+    document.addEventListener('visibilitychange',()=>{ if(!document.hidden) reg.update().catch(()=>{}); });
+  }).catch(()=>{});
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(!hadController||reloading) return; reloading=true; location.reload(); });
+}
 </script>
 </body>
 </html>
